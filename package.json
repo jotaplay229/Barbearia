@@ -1,0 +1,16 @@
+{
+  "name": "barberos-vercel-evolution-por-dono",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "latest"
+  },
+  "devDependencies": {
+    "vercel": "latest"
+  }
+}
