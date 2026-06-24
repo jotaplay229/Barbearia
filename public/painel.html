@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Painel da Barbearia · BarberOS</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -50,7 +49,7 @@ body:after{content:"";position:fixed;left:-15%;bottom:-30%;width:55vw;height:55v
       <button class="btn primary full" id="loginBtn" onclick="loginFn()">Entrar agora</button>
       <button class="btn full" onclick="demoMode()">Ver painel em modo demonstração</button>
       <div id="loginErr" class="error"></div>
-      <p class="mini">Se o botão não entrar, confira na Vercel as variáveis SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY.</p>
+      <p class="mini">Se o botão não entrar, confira as variáveis cadastradas na Vercel.</p>
     </section>
   </div>
 </div>
@@ -74,18 +73,17 @@ body:after{content:"";position:fixed;left:-15%;bottom:-30%;width:55vw;height:55v
 </div>
 <div class="toast" id="toast">Salvo!</div>
 <script>
-const FALLBACK_SUPABASE_URL='https://dywlgfnlzbrjrxgtopkr.supabase.co';
-const FALLBACK_SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5d2xnZm5semJyanJ4Z3RvcGtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNTk2MzQsImV4cCI6MjA5NzgzNTYzNH0.PJSlTv8Taww2m4WDMX9T5FiDz2cizyIn5UNAs9Drsm0';
-let sb=null, session=null, token='', me=null, barbearia=null, current='dash', demo=false;
+let token='', me=null, barbearia=null, current='dash', demo=false;
 const demoBarb={id:'demo',nome:'Barbearia Prime',slug:'barbearia-teste',logo_url:'',whatsapp_dono:'5584999999999',endereco:'Rua Principal, 100',descricao:'Atendimento premium, cortes modernos e barba alinhada.',intervalo_minutos:30};
 const demoAgenda=[{id:'a1',hora_inicio:'09:00',cliente_nome:'Lucas Mendes',cliente_whatsapp:'5584991111111',status:'pendente',servicos:{nome:'Corte + Barba'}},{id:'a2',hora_inicio:'10:30',cliente_nome:'Pedro Alves',cliente_whatsapp:'5584992222222',status:'confirmado',servicos:{nome:'Corte degradê'}},{id:'a3',hora_inicio:'14:00',cliente_nome:'Rafael Lima',cliente_whatsapp:'5584993333333',status:'pendente',servicos:{nome:'Barba completa'}}];
 function apiUrl(route,params={}){const u=new URL('/api/router',location.origin);u.searchParams.set('route',route);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null)u.searchParams.set(k,v)});return u.pathname+u.search}
 async function getJson(url,opt={}){const r=await fetch(url,opt);const txt=await r.text();let j={};try{j=txt?JSON.parse(txt):{}}catch(e){throw new Error('A API retornou HTML/erro da Vercel. Confirme o arquivo api/router.js e o vercel.json.')}if(!r.ok)throw new Error(j.erro||j.error||('Erro HTTP '+r.status));return j}
-async function loadConfig(){try{const cfg=await getJson(apiUrl('config'),{cache:'no-store'});return{url:cfg.supabaseUrl||FALLBACK_SUPABASE_URL,key:cfg.supabaseAnonKey||FALLBACK_SUPABASE_ANON_KEY}}catch(e){console.warn(e);return{url:FALLBACK_SUPABASE_URL,key:FALLBACK_SUPABASE_ANON_KEY}}}
-async function init(){try{const cfg=await loadConfig();if(!window.supabase)throw new Error('Biblioteca do Supabase não carregou.');sb=supabase.createClient(cfg.url,cfg.key);const {data}=await sb.auth.getSession();if(data.session){session=data.session;token=session.access_token;await loadMe()}}catch(e){showErr(e.message)}}
-function request(route,opt={},params={}){if(demo)return fakeApi(route,opt,params);return getJson(apiUrl(route,params),{...opt,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...(opt.headers||{})}})}
-async function loginFn(){showErr('');try{if(!sb){const cfg=await loadConfig();sb=supabase.createClient(cfg.url,cfg.key)}loginBtn.textContent='Entrando...';const {data,error}=await sb.auth.signInWithPassword({email:email.value.trim(),password:pass.value});if(error)throw error;session=data.session;token=session.access_token;await loadMe()}catch(e){showErr(e.message||'Não foi possível entrar.')}finally{loginBtn.textContent='Entrar agora'}}
-async function logout(){try{if(sb&&!demo)await sb.auth.signOut()}catch(e){}location.reload()}
+function readStoredToken(){try{return localStorage.getItem('barberos_owner_token')||''}catch(e){return ''}}
+function saveStoredToken(v){try{v?localStorage.setItem('barberos_owner_token',v):localStorage.removeItem('barberos_owner_token')}catch(e){}}
+async function init(){try{token=readStoredToken();if(token)await loadMe()}catch(e){saveStoredToken('');showErr('Sessão expirada. Entre novamente.')}}
+function request(route,opt={},params={}){if(demo)return fakeApi(route,opt,params);const headers={'Content-Type':'application/json',...(opt.headers||{})};if(token)headers.Authorization='Bearer '+token;return getJson(apiUrl(route,params),{...opt,headers})}
+async function loginFn(){showErr('');try{loginBtn.textContent='Entrando...';const data=await request('auth-login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value,area:'owner'})});token=data.access_token;saveStoredToken(token);await loadMe()}catch(e){showErr(e.message||'Não foi possível entrar.')}finally{loginBtn.textContent='Entrar agora'}}
+async function logout(){saveStoredToken('');location.reload()}
 async function loadMe(){try{const j=await request('owner-me');me=j.user;barbearia=j.barbearia||demoBarb;openApp()}catch(e){showErr('Login feito, mas não encontrei uma barbearia ligada a esse usuário. No Super Admin, crie a barbearia com owner_user_id desse usuário. Detalhe: '+e.message)}}
 function demoMode(){demo=true;barbearia=demoBarb;openApp()}
 function openApp(){loginView.style.display='none';appView.classList.add('show');brandName.textContent=barbearia.nome||'Barbearia';if(barbearia.logo_url)logoBox.innerHTML=`<img src="${esc(barbearia.logo_url)}" alt="Logo">`;publicLink.textContent='/agendar?slug='+(barbearia.slug||'barbearia-teste');render()}
@@ -106,10 +104,110 @@ async function renderBarbeiros(){const j=await request('owner-barbeiros').catch(
 async function addBarbeiro(){await request('owner-barbeiros',{method:'POST',body:JSON.stringify({nome:bn.value})}).catch(()=>null);toast();renderBarbeiros()}
 async function renderConfig(){const j=await request('owner-settings').catch(()=>({barbearia:barbearia,horarios:[]}));barbearia=j.barbearia||barbearia;const hs=(j.horarios&&j.horarios.length?j.horarios:[0,1,2,3,4,5,6].map(d=>({dia_semana:d,ativo:d!==0,abre:'08:00',fecha:'18:00'})));content.innerHTML=`<div class="card"><div class="sectionTitle"><h3>Configuração da barbearia</h3><span>personalização pública</span></div><div class="formgrid"><div class="field"><label>Nome</label><input class="inp" id="nome" value="${esc(barbearia.nome)}"></div><div class="field"><label>Slug/link</label><input class="inp" id="slug" value="${esc(barbearia.slug)}"></div><div class="field"><label>Logo URL</label><input class="inp" id="logo_url" value="${esc(barbearia.logo_url)}"></div><div class="field"><label>WhatsApp do dono</label><input class="inp" id="whatsapp_dono" value="${esc(barbearia.whatsapp_dono)}"></div><div class="field"><label>Endereço</label><input class="inp" id="endereco" value="${esc(barbearia.endereco)}"></div><div class="field"><label>Intervalo em minutos</label><input class="inp" id="intervalo" value="${esc(barbearia.intervalo_minutos||30)}"></div></div><div class="field"><label>Descrição</label><textarea id="descricao" rows="3">${esc(barbearia.descricao)}</textarea></div><div class="sectionTitle" style="margin-top:18px"><h3>Horários</h3><span>abre/fecha</span></div><div class="days">${hs.map(h=>`<div class="day"><b>${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][h.dia_semana]}</b><label><input type="checkbox" class="hativo" data-d="${h.dia_semana}" ${h.ativo?'checked':''}> aberto</label><input class="inp habre" data-d="${h.dia_semana}" value="${esc(String(h.abre).slice(0,5))}" style="margin:8px 0"><input class="inp hfecha" data-d="${h.dia_semana}" value="${esc(String(h.fecha).slice(0,5))}"></div>`).join('')}</div><button class="btn primary" style="margin-top:16px" onclick="saveConfig()">Salvar configurações</button></div>`}
 async function saveConfig(){const horarios=[...document.querySelectorAll('.hativo')].map(ch=>{const d=ch.dataset.d;return{dia_semana:Number(d),ativo:ch.checked,abre:document.querySelector('.habre[data-d="'+d+'"]').value,fecha:document.querySelector('.hfecha[data-d="'+d+'"]').value}});const payload={nome:nome.value,slug:slug.value,logo_url:logo_url.value,whatsapp_dono:whatsapp_dono.value,endereco:endereco.value,descricao:descricao.value,intervalo_minutos:intervalo.value,horarios};await request('owner-settings',{method:'PUT',body:JSON.stringify(payload)}).catch(()=>{barbearia={...barbearia,...payload}});toast();openApp()}
-async function renderWhatsapp(){const j=await request('owner-whatsapp').catch(()=>({whatsapp:{}}));const w=j.whatsapp||{};content.innerHTML=`<div class="card"><div class="sectionTitle"><h3>WhatsApp próprio da barbearia</h3><span>Evolution API</span></div><p class="sub" style="margin-bottom:14px">Cada dono coloca aqui a própria instância Evolution. As chaves não ficam no HTML, são salvas pelo backend.</p><div class="formgrid"><div class="field"><label>Evolution API URL</label><input class="inp" id="eurl" placeholder="https://evolution.seudominio.com" value="${esc(w.evolution_api_url)}"></div><div class="field"><label>Instance name</label><input class="inp" id="inst" placeholder="barbearia-do-rei" value="${esc(w.instance_name)}"></div><div class="field"><label>API Key da Evolution</label><input class="inp" id="ekey" placeholder="cole a api key" value="${esc(w.evolution_api_key)}"></div><div class="field"><label>Número para teste</label><input class="inp" id="testnum" placeholder="5584999999999"></div></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" onclick="saveWhats()">Salvar WhatsApp</button><button class="btn" onclick="testWhats()">Enviar teste</button><button class="btn" onclick="statusWhats()">Ver status</button></div><pre id="wres" style="white-space:pre-wrap;color:#aaa;margin-top:14px;background:#090909;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px;min-height:70px"></pre></div>`}
-async function saveWhats(){const j=await request('owner-whatsapp',{method:'PUT',body:JSON.stringify({evolution_api_url:eurl.value,instance_name:inst.value,evolution_api_key:ekey.value,ativo:true})}).catch(e=>({modo:'demo',erro:e.message}));toast('WhatsApp salvo');wres.textContent=JSON.stringify(j,null,2)}
-async function testWhats(){const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'test',number:testnum.value})}).catch(e=>({erro:e.message}));wres.textContent=JSON.stringify(j,null,2)}
-async function statusWhats(){const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'status'})}).catch(e=>({erro:e.message}));wres.textContent=JSON.stringify(j,null,2)}
+async function renderWhatsapp(){
+  const j=await request('owner-whatsapp').catch(()=>({whatsapp:{}}));
+  const w=j.whatsapp||{};
+  const suggested=(barbearia?.slug||'barbearia').replace(/[^a-z0-9_-]/gi,'-').toLowerCase();
+  content.innerHTML=`
+  <div class="two">
+    <div class="card" style="overflow:hidden;position:relative">
+      <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(8px)"></div>
+      <div class="sectionTitle"><h3>Conectar WhatsApp do dono</h3><span>QR Code Evolution</span></div>
+      <p class="sub" style="margin-bottom:16px">O dono da barbearia informa a Evolution API dele, clica em gerar QR Code e escaneia no WhatsApp pelo celular. Depois disso, as confirmações e lembretes saem pelo número dele.</p>
+      <div class="formgrid">
+        <div class="field"><label>Evolution API URL</label><input class="inp" id="eurl" placeholder="https://evolution.seudominio.com" value="${esc(w.evolution_api_url)}"></div>
+        <div class="field"><label>Nome da instância</label><input class="inp" id="inst" placeholder="${esc(suggested)}" value="${esc(w.instance_name||suggested)}"></div>
+        <div class="field"><label>API Key / Global API Key</label><input class="inp" id="ekey" placeholder="cole a API Key da Evolution" value="${esc(w.evolution_api_key)}"></div>
+        <div class="field"><label>Número do WhatsApp do dono</label><input class="inp" id="testnum" placeholder="5584999999999" value="${esc(barbearia?.whatsapp_dono||'')}"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn primary" onclick="generateQr()">Gerar QR Code e conectar</button>
+        <button class="btn" onclick="refreshQr()">Atualizar QR</button>
+        <button class="btn" onclick="statusWhats()">Ver status</button>
+        <button class="btn" onclick="testWhats()">Enviar teste</button>
+        <button class="btn danger" onclick="logoutWhats()">Desconectar</button>
+      </div>
+      <div id="wres" style="color:#aaa;margin-top:14px;background:#090909;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:13px;min-height:58px;font-size:12px;white-space:pre-wrap">Preencha os dados e clique em “Gerar QR Code e conectar”.</div>
+    </div>
+    <div class="card" style="position:relative;overflow:hidden">
+      <div class="sectionTitle"><h3>QR Code</h3><span id="qrState">aguardando</span></div>
+      <div id="qrBox" style="min-height:330px;display:grid;place-items:center;border:1px dashed rgba(255,255,255,.14);border-radius:24px;background:radial-gradient(circle at 50% 20%,rgba(255,255,255,.08),transparent 35%),rgba(0,0,0,.24)">
+        <div style="text-align:center;color:var(--muted);padding:24px">
+          <div class="logoMark" style="margin:0 auto 14px;width:68px;height:68px;border-radius:24px;font-size:30px">✂</div>
+          <b style="color:#fff">QR ainda não gerado</b><br>
+          <span style="font-size:12px;line-height:1.6">Clique em gerar QR e escaneie no WhatsApp do dono.</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:grid;gap:9px;color:var(--muted);font-size:12px;line-height:1.55">
+        <div><span class="dot"></span> Abra o WhatsApp no celular do dono.</div>
+        <div>Vá em <b style="color:#fff">Dispositivos conectados</b> → <b style="color:#fff">Conectar dispositivo</b>.</div>
+        <div>Escaneie o QR Code. Depois clique em <b style="color:#fff">Ver status</b>.</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function setWres(obj){
+  if(!window.wres) return;
+  if(typeof obj==='string') wres.textContent=obj;
+  else wres.textContent=JSON.stringify(obj,null,2);
+}
+
+function renderQr(qr){
+  const data=qr?.qrcode||qr;
+  const img=data?.qrDataUrl;
+  const pairing=data?.pairingCode;
+  const text=data?.qrText;
+  qrState.textContent=img?'pronto':'sem QR';
+  if(img){
+    qrBox.innerHTML=`<div style="text-align:center;animation:rise .35s ease both"><div style="background:#fff;border-radius:28px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);display:inline-block"><img src="${img}" alt="QR Code WhatsApp" style="width:min(260px,72vw);height:auto;display:block;border-radius:16px"></div><div style="margin-top:14px;color:#fff;font-weight:900">Escaneie para conectar</div>${pairing?`<div style="margin-top:6px;color:var(--muted);font-size:12px">Código: <b style="color:#fff">${esc(pairing)}</b></div>`:''}</div>`;
+  }else{
+    qrBox.innerHTML=`<div style="text-align:center;color:var(--muted);padding:24px"><b style="color:#fff">A Evolution não retornou QR ainda</b><br><span style="font-size:12px;line-height:1.6">Tente clicar em Atualizar QR em alguns segundos.</span>${pairing?`<div style="margin-top:10px">Código: <b style="color:#fff">${esc(pairing)}</b></div>`:''}${text?`<div style="margin-top:10px;word-break:break-all;font-size:11px">${esc(text)}</div>`:''}</div>`;
+  }
+}
+
+async function saveWhats(silent=false){
+  const j=await request('owner-whatsapp',{method:'PUT',body:JSON.stringify({evolution_api_url:eurl.value,instance_name:inst.value,evolution_api_key:ekey.value,ativo:true})}).catch(e=>({erro:e.message}));
+  if(!silent) toast(j.erro?'Erro ao salvar':'WhatsApp salvo');
+  setWres(j);
+  return j;
+}
+
+async function generateQr(){
+  qrState.textContent='gerando...';
+  qrBox.innerHTML='<div style="text-align:center;color:var(--muted)"><div class="logoMark" style="margin:0 auto 14px;width:68px;height:68px;border-radius:24px;font-size:30px;animation:phoneFloat 1.4s ease-in-out infinite">✂</div><b style="color:#fff">Gerando QR Code...</b><br><span>criando/conectando instância Evolution</span></div>';
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'save-and-qrcode',evolution_api_url:eurl.value,instance_name:inst.value,evolution_api_key:ekey.value,number:testnum.value,ativo:true})}).catch(e=>({erro:e.message}));
+  setWres(j);
+  if(j.qrcode) renderQr(j.qrcode); else qrState.textContent='erro';
+  if(!j.erro) toast('QR Code gerado');
+}
+
+async function refreshQr(){
+  qrState.textContent='atualizando...';
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'refresh-qrcode',number:testnum.value})}).catch(e=>({erro:e.message}));
+  setWres(j);
+  if(j.qrcode) renderQr(j.qrcode); else qrState.textContent='erro';
+}
+
+async function testWhats(){
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'test',number:testnum.value})}).catch(e=>({erro:e.message}));
+  setWres(j);
+  if(!j.erro) toast('Mensagem de teste enviada');
+}
+
+async function statusWhats(){
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'status'})}).catch(e=>({erro:e.message}));
+  setWres(j);
+  const raw=JSON.stringify(j).toLowerCase();
+  qrState.textContent=raw.includes('open')||raw.includes('connected')||raw.includes('conectado')?'conectado':'verifique';
+}
+
+async function logoutWhats(){
+  if(!confirm('Desconectar este WhatsApp da instância Evolution?')) return;
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'logout'})}).catch(e=>({erro:e.message}));
+  setWres(j);
+  if(!j.erro) toast('WhatsApp desconectado');
+}
 function copyPublicLink(){navigator.clipboard?.writeText(location.origin+'/agendar?slug='+(barbearia?.slug||'barbearia-teste'));toast('Link copiado!')}
 async function fakeApi(route,opt,params){await new Promise(r=>setTimeout(r,180));if(route==='owner-me')return{user:{email:'demo@barberos.com'},barbearia:demoBarb};if(route==='owner-agenda')return{agendamentos:demoAgenda};if(route==='owner-servicos')return{servicos:[{nome:'Corte degradê',duracao_minutos:30,preco_cents:3500,ativo:true},{nome:'Corte + Barba',duracao_minutos:60,preco_cents:6500,ativo:true},{nome:'Barba completa',duracao_minutos:30,preco_cents:3000,ativo:true}]};if(route==='owner-barbeiros')return{barbeiros:[{nome:'Rafael Santos',ativo:true},{nome:'Bruno Lima',ativo:true},{nome:'Gabriel Costa',ativo:true}]};if(route==='owner-settings')return{barbearia:demoBarb,horarios:[]};if(route==='owner-whatsapp')return{whatsapp:{evolution_api_url:'',instance_name:'',evolution_api_key:''}};return{ok:true}}
 pass?.addEventListener('keydown',e=>{if(e.key==='Enter')loginFn()});
