@@ -1,12 +1,6 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
-  "crons": [
-    {
-      "path": "/api/cron-lembretes",
-      "schedule": "0 * * * *"
-    }
-  ],
   "rewrites": [
     { "source": "/admin-saas", "destination": "/admin-saas.html" },
     { "source": "/painel", "destination": "/painel.html" },
