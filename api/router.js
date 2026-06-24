@@ -1,4 +1,5 @@
 import agendamentos from '../server/agendamentos.js';
+import authLogin from '../server/auth-login.js';
 import confirmar from '../server/confirmar.js';
 import config from '../server/config.js';
 import cronLembretes from '../server/cron-lembretes.js';
@@ -16,6 +17,7 @@ import saasDashboard from '../server/saas-dashboard.js';
 
 const routes = {
   'agendamentos': agendamentos,
+  'auth-login': authLogin,
   'confirmar': confirmar,
   'config': config,
   'cron-lembretes': cronLembretes,
