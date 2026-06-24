@@ -9,7 +9,8 @@
     "build": "echo \"No build step required\""
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "qrcode": "latest"
   },
   "devDependencies": {}
 }
