@@ -5,12 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "start": "vercel dev"
+    "start": "vercel dev",
+    "build": "echo \"No build step required\""
   },
   "dependencies": {
     "@supabase/supabase-js": "latest"
   },
-  "devDependencies": {
-    "vercel": "latest"
-  }
+  "devDependencies": {}
 }
