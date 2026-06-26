@@ -1,7 +1,7 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
-import { connectionState, connectInstance, createInstance, logoutInstance, maskSecret, sendText, setWebhook } from '../lib/evolution.js';
+import { connectionState, connectInstance, createInstance, logoutInstance, maskSecret, normalizeQrPayload, sendText, setWebhook } from '../lib/evolution.js';
 import { normalizeBarbearia } from '../lib/db-compat.js';
 
 function appUrlFromReq(req) {
@@ -79,7 +79,7 @@ function buildWhatsappPayload(loja, existing = null, body = {}) {
 
 function assertEvolutionConfig(payload) {
   if (!payload.evolution_api_url || !payload.evolution_api_key) {
-    throw new Error('Configure EVOLUTION_API_URL e EVOLUTION_API_KEY nas variaveis da Vercel e faca um novo deploy.');
+    throw new Error('WhatsApp ainda nao esta configurado. Fale com o suporte.');
   }
   if (!payload.instance_name) {
     throw new Error('Nao foi possivel gerar o nome da instancia da loja.');
@@ -168,7 +168,7 @@ export default async function handler(req, res) {
     if (action === 'create-instance' || action === 'qrcode' || action === 'save-and-qrcode') {
       const webhookUrl = `${appUrlFromReq(req).replace(/\/$/, '')}/api/evolution-webhook`;
       const number = safeString(body.number || loja.whatsapp_dono);
-      if (!number) return json(res, 400, { erro: 'Informe o numero do WhatsApp do dono.' });
+      if (!number) return json(res, 400, { erro: 'Informe o numero do WhatsApp da barbearia.' });
 
       const created = await createInstance({
         apiUrl: whats.evolution_api_url,
@@ -177,6 +177,13 @@ export default async function handler(req, res) {
         webhookUrl,
         number
       });
+
+      let createdQr = null;
+      try {
+        createdQr = await normalizeQrPayload(created);
+      } catch {
+        createdQr = null;
+      }
 
       let webhook = null;
       try {
@@ -190,18 +197,27 @@ export default async function handler(req, res) {
         webhook = { erro: err.message };
       }
 
-      const qr = await connectInstance({
-        apiUrl: whats.evolution_api_url,
-        apiKey: whats.evolution_api_key,
-        instanceName: whats.instance_name,
-        number
-      });
+      let connectedQr = null;
+      let connectError = null;
+      try {
+        connectedQr = await connectInstance({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name,
+          number
+        });
+      } catch (err) {
+        connectError = err.message;
+        if (!createdQr?.qrDataUrl && !createdQr?.qrText && !createdQr?.pairingCode) throw err;
+      }
+      const qr = connectedQr?.qrDataUrl || connectedQr?.qrText || connectedQr?.pairingCode ? connectedQr : createdQr;
 
       return json(res, 200, {
         sucesso: true,
-        message: qr.qrDataUrl ? 'QR Code gerado. Escaneie pelo WhatsApp do dono.' : 'Instancia criada, mas a Evolution nao retornou QR Code ainda. Tente atualizar em alguns segundos.',
+        message: qr?.qrDataUrl ? 'QR Code gerado. Escaneie pelo WhatsApp da barbearia.' : 'A conexao foi preparada, mas o QR Code ainda nao ficou disponivel. Tente atualizar em alguns segundos.',
         created,
         webhook,
+        connectError,
         qrcode: qr,
         webhookUrl,
         whatsapp: publicWhatsapp(whats)
