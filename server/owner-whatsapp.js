@@ -81,6 +81,9 @@ function assertEvolutionConfig(payload) {
   if (!payload.evolution_api_url || !payload.evolution_api_key) {
     throw new Error('WhatsApp ainda nao esta configurado. Fale com o suporte.');
   }
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(payload.evolution_api_url)) {
+    throw new Error('A URL da Evolution precisa ser publica. localhost so funciona no seu PC e a Vercel nao consegue acessar.');
+  }
   if (!payload.instance_name) {
     throw new Error('Nao foi possivel gerar o nome da instancia da loja.');
   }
