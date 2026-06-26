@@ -1,7 +1,24 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
-import { normalizeBarbearia } from '../lib/db-compat.js';
+import { normalizeBarbearia, storeMetaDescription } from '../lib/db-compat.js';
+
+function cleanTimes(value) {
+  const arr = Array.isArray(value) ? value : String(value || '').split(/[,\n;]/);
+  return [...new Set(arr
+    .map(v => safeString(v).slice(0, 5))
+    .filter(v => /^\d{2}:\d{2}$/.test(v))
+    .sort())];
+}
+
+function cleanCustomHours(value) {
+  const out = {};
+  const source = value && typeof value === 'object' ? value : {};
+  for (let d = 0; d <= 6; d++) {
+    out[d] = cleanTimes(source[d] || source[String(d)] || []);
+  }
+  return out;
+}
 
 export default async function handler(req, res) {
   if (!method(req, res, ['GET', 'PUT'])) return;
@@ -18,14 +35,15 @@ export default async function handler(req, res) {
     }
 
     const body = req.body || {};
+    const horariosCustom = cleanCustomHours(body.horarios_custom || loja.horarios_custom);
     const update = {
       nome: safeString(body.nome, loja.nome),
       slug: safeString(body.slug, loja.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       logo_url: safeString(body.logo_url),
       telefone_whatsapp: normalizePhoneBR(body.whatsapp_dono),
       endereco: safeString(body.endereco),
-      descricao: safeString(body.descricao),
-      intervalo_minutos: Number(body.intervalo_minutos || loja.intervalo_minutos || 30),
+      descricao: storeMetaDescription({ descricao: safeString(body.descricao, loja.descricao), horarios_custom: horariosCustom }),
+      intervalo_minutos: Math.max(1, Number(body.intervalo_minutos || loja.intervalo_minutos || 30)),
       cor_principal: safeString(body.cor_primaria, '#ffffff')
     };
 

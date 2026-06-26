@@ -18,6 +18,12 @@ function dayOfWeek(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
+function customSlotsForDay(loja, dow) {
+  const slots = loja.horarios_custom?.[dow] || loja.horarios_custom?.[String(dow)] || [];
+  return Array.isArray(slots)
+    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(t => /^\d{2}:\d{2}$/.test(t)))].sort()
+    : [];
+}
 
 export default async function handler(req, res) {
   if (!method(req, res, ['GET'])) return;
@@ -78,9 +84,18 @@ export default async function handler(req, res) {
     const open = toMinutes(horario.abre);
     const close = toMinutes(horario.fecha);
     const horarios = [];
-    for (let m = open; m + duracao <= close; m += intervalo) {
-      const t = toTime(m);
-      if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+    const customSlots = customSlotsForDay(loja, dow);
+    if (customSlots.length) {
+      for (const t of customSlots) {
+        const m = toMinutes(t);
+        if (m < open || m + duracao > close) continue;
+        if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+      }
+    } else {
+      for (let m = open; m + duracao <= close; m += intervalo) {
+        const t = toTime(m);
+        if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+      }
     }
     return json(res, 200, { horarios });
   } catch (err) {
