@@ -1,6 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { json, method, safeString } from '../lib/http.js';
 
+function allowedSaasEmails() {
+  return [
+    process.env.SAAS_ADMIN_EMAILS,
+    process.env.SAAS_ADMIN_EMAIL,
+    process.env.ADMIN_EMAILS,
+    process.env.ADMIN_EMAIL
+  ]
+    .filter(Boolean)
+    .join(',')
+    .split(/[,;\n]/)
+    .map(email => email.trim().replace(/^['"]|['"]$/g, '').toLowerCase())
+    .filter(Boolean);
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['POST'])) return;
 
@@ -15,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-      return json(res, 500, { erro: 'Supabase não configurado nas Environment Variables da Vercel.' });
+      return json(res, 500, { erro: 'Supabase nao configurado nas Environment Variables da Vercel.' });
     }
 
     const supabaseAuth = createClient(
@@ -31,17 +45,18 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
     if (error || !data?.session?.access_token) {
-      return json(res, 401, { erro: error?.message || 'Login inválido.' });
+      return json(res, 401, { erro: error?.message || 'Login invalido.' });
     }
 
     if (area === 'saas') {
-      const allowed = String(process.env.SAAS_ADMIN_EMAILS || '')
-        .split(',')
-        .map(e => e.trim().toLowerCase())
-        .filter(Boolean);
+      const allowed = allowedSaasEmails();
+
+      if (!allowed.length) {
+        return json(res, 403, { erro: 'Configure SAAS_ADMIN_EMAILS na Vercel e faca um novo deploy.' });
+      }
 
       if (!allowed.includes(email)) {
-        return json(res, 403, { erro: 'Este e-mail não está liberado como dono do SaaS.' });
+        return json(res, 403, { erro: 'Este e-mail nao esta liberado como dono do SaaS. Confira SAAS_ADMIN_EMAILS na Vercel e faca redeploy.' });
       }
     }
 

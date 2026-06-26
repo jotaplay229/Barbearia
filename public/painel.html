@@ -111,23 +111,20 @@ async function renderWhatsapp(){
   content.innerHTML=`
   <div class="two">
     <div class="card" style="overflow:hidden;position:relative">
-      <div style="position:absolute;right:-90px;top:-90px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(8px)"></div>
       <div class="sectionTitle"><h3>Conectar WhatsApp do dono</h3><span>QR Code Evolution</span></div>
-      <p class="sub" style="margin-bottom:16px">O dono da barbearia informa a Evolution API dele, clica em gerar QR Code e escaneia no WhatsApp pelo celular. Depois disso, as confirmações e lembretes saem pelo número dele.</p>
+      <p class="sub" style="margin-bottom:16px">Informe apenas o numero do dono. A instancia e criada automaticamente com o nome da loja e a Evolution usa as variaveis configuradas na Vercel.</p>
       <div class="formgrid">
-        <div class="field"><label>Evolution API URL</label><input class="inp" id="eurl" placeholder="https://evolution.seudominio.com" value="${esc(w.evolution_api_url)}"></div>
-        <div class="field"><label>Nome da instância</label><input class="inp" id="inst" placeholder="${esc(suggested)}" value="${esc(w.instance_name||suggested)}"></div>
-        <div class="field"><label>API Key / Global API Key</label><input class="inp" id="ekey" placeholder="cole a API Key da Evolution" value="${esc(w.evolution_api_key)}"></div>
-        <div class="field"><label>Número do WhatsApp do dono</label><input class="inp" id="testnum" placeholder="5584999999999" value="${esc(barbearia?.whatsapp_dono||'')}"></div>
+        <div class="field"><label>Numero do WhatsApp do dono</label><input class="inp" id="testnum" placeholder="5584999999999" value="${esc(barbearia?.whatsapp_dono||'')}"></div>
+        <div class="field"><label>Instancia automatica</label><input class="inp" value="${esc(w.instance_name||('barbearia-'+suggested))}" disabled></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         <button class="btn primary" onclick="generateQr()">Gerar QR Code e conectar</button>
         <button class="btn" onclick="refreshQr()">Atualizar QR</button>
         <button class="btn" onclick="statusWhats()">Ver status</button>
         <button class="btn" onclick="testWhats()">Enviar teste</button>
-        <button class="btn danger" onclick="logoutWhats()">Desconectar</button>
+        <button class="btn" onclick="logoutWhats()">Desconectar</button>
       </div>
-      <div id="wres" style="color:#aaa;margin-top:14px;background:#090909;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:13px;min-height:58px;font-size:12px;white-space:pre-wrap">Preencha os dados e clique em “Gerar QR Code e conectar”.</div>
+      <div id="wres" style="color:#aaa;margin-top:14px;background:#090909;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:13px;min-height:58px;font-size:12px;white-space:pre-wrap">Digite o telefone e clique em Gerar QR Code.</div>
     </div>
     <div class="card" style="position:relative;overflow:hidden">
       <div class="sectionTitle"><h3>QR Code</h3><span id="qrState">aguardando</span></div>
@@ -167,8 +164,8 @@ function renderQr(qr){
 }
 
 async function saveWhats(silent=false){
-  const j=await request('owner-whatsapp',{method:'PUT',body:JSON.stringify({evolution_api_url:eurl.value,instance_name:inst.value,evolution_api_key:ekey.value,ativo:true})}).catch(e=>({erro:e.message}));
-  if(!silent) toast(j.erro?'Erro ao salvar':'WhatsApp salvo');
+  const j=await request('owner-whatsapp',{method:'PUT',body:JSON.stringify({number:testnum.value,ativo:true})}).catch(e=>({erro:e.message}));
+  if(!silent) toast(j.erro?'Erro ao preparar WhatsApp':'WhatsApp preparado');
   setWres(j);
   return j;
 }
@@ -176,7 +173,7 @@ async function saveWhats(silent=false){
 async function generateQr(){
   qrState.textContent='gerando...';
   qrBox.innerHTML='<div style="text-align:center;color:var(--muted)"><div class="logoMark" style="margin:0 auto 14px;width:68px;height:68px;border-radius:24px;font-size:30px;animation:phoneFloat 1.4s ease-in-out infinite">✂</div><b style="color:#fff">Gerando QR Code...</b><br><span>criando/conectando instância Evolution</span></div>';
-  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'save-and-qrcode',evolution_api_url:eurl.value,instance_name:inst.value,evolution_api_key:ekey.value,number:testnum.value,ativo:true})}).catch(e=>({erro:e.message}));
+  const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'save-and-qrcode',number:testnum.value,ativo:true})}).catch(e=>({erro:e.message}));
   setWres(j);
   if(j.qrcode) renderQr(j.qrcode); else qrState.textContent='erro';
   if(!j.erro) toast('QR Code gerado');
@@ -209,7 +206,7 @@ async function logoutWhats(){
   if(!j.erro) toast('WhatsApp desconectado');
 }
 function copyPublicLink(){navigator.clipboard?.writeText(location.origin+'/b/'+(barbearia?.slug||'barbearia-teste'));toast('Link copiado!')}
-async function fakeApi(route,opt,params){await new Promise(r=>setTimeout(r,180));if(route==='owner-me')return{user:{email:'demo@barberos.com'},barbearia:demoBarb};if(route==='owner-agenda')return{agendamentos:demoAgenda};if(route==='owner-servicos')return{servicos:[{nome:'Corte degradê',duracao_minutos:30,preco_cents:3500,ativo:true},{nome:'Corte + Barba',duracao_minutos:60,preco_cents:6500,ativo:true},{nome:'Barba completa',duracao_minutos:30,preco_cents:3000,ativo:true}]};if(route==='owner-barbeiros')return{barbeiros:[{nome:'Rafael Santos',ativo:true},{nome:'Bruno Lima',ativo:true},{nome:'Gabriel Costa',ativo:true}]};if(route==='owner-settings')return{barbearia:demoBarb,horarios:[]};if(route==='owner-whatsapp')return{whatsapp:{evolution_api_url:'',instance_name:'',evolution_api_key:''}};return{ok:true}}
+async function fakeApi(route,opt,params){await new Promise(r=>setTimeout(r,180));if(route==='owner-me')return{user:{email:'demo@barberos.com'},barbearia:demoBarb};if(route==='owner-agenda')return{agendamentos:demoAgenda};if(route==='owner-servicos')return{servicos:[{nome:'Corte degradê',duracao_minutos:30,preco_cents:3500,ativo:true},{nome:'Corte + Barba',duracao_minutos:60,preco_cents:6500,ativo:true},{nome:'Barba completa',duracao_minutos:30,preco_cents:3000,ativo:true}]};if(route==='owner-barbeiros')return{barbeiros:[{nome:'Rafael Santos',ativo:true},{nome:'Bruno Lima',ativo:true},{nome:'Gabriel Costa',ativo:true}]};if(route==='owner-settings')return{barbearia:demoBarb,horarios:[]};if(route==='owner-whatsapp')return{whatsapp:{instance_name:'barbearia-barbeiro-teste'}};return{ok:true}}
 pass?.addEventListener('keydown',e=>{if(e.key==='Enter')loginFn()});
 init();
 </script>
