@@ -1,7 +1,7 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { sendText } from '../lib/evolution.js';
-import { msgClienteRecebido, msgDonoNovo } from '../lib/messages.js';
+import { msgClienteConfirmado } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, normalizeServico, serviceForBarber, whatsappLogPayload } from '../lib/db-compat.js';
 
 function toMinutes(t) {
@@ -17,6 +17,11 @@ function toTime(min) {
   const h = String(Math.floor(min / 60)).padStart(2, '0');
   const m = String(min % 60).padStart(2, '0');
   return `${h}:${m}`;
+}
+
+function dayOfWeek(dateStr) {
+  const [y, m, d] = String(dateStr || '').split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
 async function getWhatsapp(barbeariaId) {
@@ -58,6 +63,9 @@ export default async function handler(req, res) {
 
     if (!slug || !cliente_nome || !cliente_whatsapp || !servico_id || !data_agendamento || !hora_inicio) {
       return json(res, 400, { erro: 'Dados obrigatórios faltando.' });
+    }
+    if (!/^\d{2}:\d{2}$/.test(hora_inicio)) {
+      return json(res, 400, { erro: 'Informe um horario valido.' });
     }
 
     const { data: barbearia, error: e1 } = await supabaseAdmin
@@ -110,6 +118,23 @@ export default async function handler(req, res) {
 
     const start = toMinutes(hora_inicio);
     const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
+    const dow = dayOfWeek(data_agendamento);
+    const { data: horario, error: eHorario } = await supabaseAdmin
+      .from('horarios_funcionamento')
+      .select('*')
+      .eq('barbearia_id', loja.id)
+      .eq('dia_semana', dow)
+      .maybeSingle();
+    if (eHorario) throw eHorario;
+    if (!horario || !horario.ativo) {
+      return json(res, 400, { erro: 'A barbearia nao atende nesse dia.' });
+    }
+    const open = toMinutes(horario.abre);
+    const close = toMinutes(horario.fecha);
+    if (start < open || end > close) {
+      return json(res, 400, { erro: `Escolha um horario entre ${String(horario.abre).slice(0, 5)} e ${String(horario.fecha).slice(0, 5)}.` });
+    }
+
     const ocupado = (ocupados || []).find(a => {
       const busyStart = toMinutes(String(a.hora_inicio).slice(0, 5));
       const busyEnd = a.hora_fim ? toMinutes(String(a.hora_fim).slice(0, 5)) : busyStart + Number(normalizeServico(a.servicos || {}).duracao_minutos || loja.intervalo_minutos || 30);
@@ -150,7 +175,7 @@ export default async function handler(req, res) {
         hora_inicio,
         hora_fim: toTime(end),
         observacao: observacoes,
-        status: 'pendente'
+        status: 'confirmado'
       })
       .select('*')
       .single();
@@ -165,14 +190,12 @@ export default async function handler(req, res) {
     const avisos = [];
 
     if (whats) {
-      const textoCliente = msgClienteRecebido({
+      const textoCliente = msgClienteConfirmado({
         barbearia: loja,
         cliente_nome,
         servico_nome: servicoNorm.nome,
-        barbeiro_nome: barbeiro?.nome,
         data_agendamento,
-        hora_inicio,
-        agendamento_id: agendamento.id
+        hora_inicio
       });
       try {
         const retorno = await sendText({
@@ -182,36 +205,10 @@ export default async function handler(req, res) {
           number: cliente_whatsapp,
           text: textoCliente
         });
-        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'enviado', retorno });
+        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_confirmado', texto: textoCliente, status: 'enviado', retorno });
         avisos.push('cliente');
       } catch (err) {
-        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'erro', erro: err.message });
-      }
-
-      if (loja.whatsapp_dono) {
-        const textoDono = msgDonoNovo({
-          barbearia: loja,
-          cliente_nome,
-          cliente_whatsapp,
-          servico_nome: servicoNorm.nome,
-          barbeiro_nome: barbeiro?.nome,
-          data_agendamento,
-          hora_inicio,
-          agendamento_id: agendamento.id
-        });
-        try {
-          const retorno = await sendText({
-            apiUrl: whats.evolution_api_url,
-            apiKey: whats.evolution_api_key,
-            instanceName: whats.instance_name,
-            number: loja.whatsapp_dono,
-            text: textoDono
-          });
-          await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: loja.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'enviado', retorno });
-          avisos.push('dono');
-        } catch (err) {
-          await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: loja.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'erro', erro: err.message });
-        }
+        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_confirmado', texto: textoCliente, status: 'erro', erro: err.message });
       }
     }
 
