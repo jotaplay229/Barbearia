@@ -73,7 +73,10 @@ export default async function handler(req, res) {
   if (!method(req, res, ['GET'])) return;
   try {
     if (process.env.CRON_SECRET && req.query.secret !== process.env.CRON_SECRET) {
-      return json(res, 401, { erro: 'Cron não autorizado.' });
+      return json(res, 401, {
+        erro: 'Cron nao autorizado.',
+        detalhe: 'Adicione ?secret=SUA_CHAVE no final da URL do cron.'
+      });
     }
 
     const target24 = plusHours(24);
