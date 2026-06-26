@@ -48,7 +48,7 @@ const pathParts=location.pathname.split('/').filter(Boolean);
 let slug=qs.get('slug') || (pathParts[0]==='b'?pathParts[1]:pathParts[pathParts.length-1]) || 'barbearia-teste';
 let step=1, sel={servico:null,barbeiro:null,data:null,hora:null};
 let data={barbearia:null,servicos:[],barbeiros:[],horarios:[]};
-let usingDemo=false;
+let usingDemo=qs.get('demo')==='1';
 const demoData={
   barbearia:{id:'demo-barbearia',nome:'Barbearia Elite',descricao:'Cortes modernos, barba alinhada e atendimento premium.',endereco:'Centro • Agendamento online',logo_url:null,status:'ativa'},
   servicos:[
@@ -65,17 +65,36 @@ const demoData={
 };
 function apiUrl(route, params={}){const u=new URL('/api/router', location.origin);u.searchParams.set('route', route);for(const [k,v] of Object.entries(params)){if(v!==undefined&&v!==null)u.searchParams.set(k,v)}return u.toString()}
 async function fetchJson(url, options){const resp=await fetch(url,options);const text=await resp.text();let json=null;try{json=JSON.parse(text)}catch(e){throw new Error('A API não retornou JSON. Confira se existe api/router.js e se o deploy foi atualizado.')}if(!resp.ok)throw new Error(json.erro||json.message||'Erro na API');return json}
-function money(c){return Number(c||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function money(c){return (Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function isoPlus(i){const d=new Date();d.setDate(d.getDate()+i);return d.toISOString().slice(0,10)}
 function brDate(d){const [y,m,dd]=String(d).split('-');return `${dd}/${m}`}
 function weekday(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')}
 function initials(n){return String(n||'').split(' ').filter(Boolean).map(x=>x[0]).slice(0,2).join('').toUpperCase()||'✂'}
-async function load(){try{const j=await fetchJson(apiUrl('public-barbearia',{slug}));if(j.erro)throw new Error(j.erro);data=j;usingDemo=false}catch(e){usingDemo=true;data=demoData;console.warn(e)}hydrateBrand();render()}
+async function load(){
+  if(usingDemo){data=demoData;hydrateBrand();render();return}
+  try{
+    const j=await fetchJson(apiUrl('public-barbearia',{slug}));
+    if(j.erro)throw new Error(j.erro);
+    data=j;
+    hydrateBrand();
+    render();
+  }catch(e){
+    showLoadError(e);
+  }
+}
+function showLoadError(e){
+  nome.textContent='Agenda indisponível';
+  desc.textContent='Não foi possível carregar essa barbearia.';
+  statusText.textContent='Verifique o link';
+  bottom.classList.add('hide');
+  app.innerHTML=`<section class="section"><div class="notice err"><b>Não consegui abrir essa agenda.</b><br>${esc(e.message||'Confira se o slug existe, se a API está publicada e se as variáveis do Supabase estão na Vercel.')}</div></section>`;
+}
 function hydrateBrand(){nome.textContent=data.barbearia?.nome||'Barbearia';desc.textContent=data.barbearia?.descricao||data.barbearia?.endereco||'Agende seu horário em poucos toques';statusText.textContent=usingDemo?'Modo demonstração':'Agenda online';if(data.barbearia?.logo_url){logo.innerHTML=`<img alt="Logo" src="${data.barbearia.logo_url}">`}else{logo.textContent='✂'}}
 function setSteps(){[st1,st2,st3,st4].forEach((el,i)=>{el.classList.toggle('on',i<step);el.classList.toggle('current',i===step-1)});next.textContent=step===4?'Confirmar':'Continuar';next.disabled=(step===1&&!sel.servico)||(step===2&&!sel.barbeiro)||(step===3&&(!sel.data||!sel.hora));}
 function summary(){sum1.textContent=sel.servico?sel.servico.nome:'Escolha seu horário';sum2.textContent=[sel.barbeiro?.nome,sel.data?brDate(sel.data):null,sel.hora].filter(Boolean).join(' · ')||'Serviço, profissional, data e hora'}
 function render(){setSteps();summary();if(step===1)renderServicos();else if(step===2)renderBarbeiros();else if(step===3)renderDataHora();else renderCliente()}
-function demoNotice(){return usingDemo?'<div class="notice">Modo demonstração ativo. A API ainda não respondeu JSON na Vercel, mas a tela já está funcionando visualmente.</div>':''}
+function demoNotice(){return usingDemo?'<div class="notice">Modo demonstração ativo. Nenhum agendamento real será salvo.</div>':''}
 function renderServicos(){app.innerHTML=`<section class="section">${demoNotice()}<div class="sectionHeader"><div><h2>Escolha o serviço</h2><small>Selecione o que você deseja fazer</small></div></div><div class="grid">${data.servicos.map(s=>`<button class="cardBtn ${sel.servico?.id===s.id?'selected':''}" onclick="pickServico('${s.id}')"><div class="icon">✂</div><div class="info"><b>${s.nome}</b><span>${s.duracao_minutos||30} min de duração</span></div><div class="price">${money(s.preco_cents)}</div><div class="check"></div></button>`).join('')}</div></section>`}
 function pickServico(id){sel.servico=data.servicos.find(s=>String(s.id)===String(id));sel.hora=null;render()}
 function renderBarbeiros(){app.innerHTML=`<section class="section"><div class="sectionHeader"><div><h2>Escolha o profissional</h2><small>Profissionais disponíveis</small></div></div><div class="grid">${data.barbeiros.map(b=>`<button class="cardBtn ${sel.barbeiro?.id===b.id?'selected':''}" onclick="pickBarbeiro('${b.id}')"><div class="icon">${initials(b.nome)}</div><div class="info"><b>${b.nome}</b><span>Disponível para agendamento</span></div><div class="check"></div></button>`).join('')}</div></section>`}

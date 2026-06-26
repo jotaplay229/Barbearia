@@ -2,6 +2,22 @@ import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { sendText } from '../lib/evolution.js';
 import { msgClienteRecebido, msgDonoNovo } from '../lib/messages.js';
+import { normalizeAgendamento, normalizeBarbearia, normalizeServico, whatsappLogPayload } from '../lib/db-compat.js';
+
+function toMinutes(t) {
+  const [h, m] = String(t || '00:00').split(':').map(Number);
+  return h * 60 + m;
+}
+
+function overlaps(startA, endA, startB, endB) {
+  return startA < endB && endA > startB;
+}
+
+function toTime(min) {
+  const h = String(Math.floor(min / 60)).padStart(2, '0');
+  const m = String(min % 60).padStart(2, '0');
+  return `${h}:${m}`;
+}
 
 async function getWhatsapp(barbeariaId) {
   const { data, error } = await supabaseAdmin
@@ -15,7 +31,7 @@ async function getWhatsapp(barbeariaId) {
 }
 
 async function logWhatsapp({ barbearia_id, agendamento_id, destino, tipo, texto, status, erro, retorno }) {
-  await supabaseAdmin.from('whatsapp_logs').insert({
+  await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({
     barbearia_id,
     agendamento_id,
     destino,
@@ -24,7 +40,7 @@ async function logWhatsapp({ barbearia_id, agendamento_id, destino, tipo, texto,
     status,
     erro: erro || null,
     retorno: retorno || null
-  });
+  }));
 }
 
 export default async function handler(req, res) {
@@ -52,16 +68,18 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (e1) throw e1;
     if (!barbearia) return json(res, 404, { erro: 'Barbearia não encontrada ou indisponível.' });
+    const loja = normalizeBarbearia(barbearia);
 
     const { data: servico, error: e2 } = await supabaseAdmin
       .from('servicos')
-      .select('id,nome,preco_cents,duracao_minutos')
+      .select('*')
       .eq('id', servico_id)
-      .eq('barbearia_id', barbearia.id)
+      .eq('barbearia_id', loja.id)
       .eq('ativo', true)
       .maybeSingle();
     if (e2) throw e2;
     if (!servico) return json(res, 404, { erro: 'Serviço indisponível.' });
+    const servicoNorm = normalizeServico(servico);
 
     let barbeiro = null;
     if (barbeiro_id) {
@@ -69,7 +87,7 @@ export default async function handler(req, res) {
         .from('barbeiros')
         .select('id,nome')
         .eq('id', barbeiro_id)
-        .eq('barbearia_id', barbearia.id)
+        .eq('barbearia_id', loja.id)
         .eq('ativo', true)
         .maybeSingle();
       if (r.error) throw r.error;
@@ -77,24 +95,32 @@ export default async function handler(req, res) {
       if (!barbeiro) return json(res, 404, { erro: 'Barbeiro indisponível.' });
     }
 
-    const { data: ocupado, error: e3 } = await supabaseAdmin
+    let conflitosQuery = supabaseAdmin
       .from('agendamentos')
-      .select('id')
-      .eq('barbearia_id', barbearia.id)
+      .select('id,hora_inicio,hora_fim,servicos(*)')
+      .eq('barbearia_id', loja.id)
       .eq('data_agendamento', data_agendamento)
-      .eq('hora_inicio', hora_inicio)
-      .eq('barbeiro_id', barbeiro_id)
-      .not('status', 'in', '(cancelado,recusado)')
-      .maybeSingle();
+      .not('status', 'in', '(cancelado,recusado,cancelado_cliente)');
+    conflitosQuery = barbeiro_id ? conflitosQuery.eq('barbeiro_id', barbeiro_id) : conflitosQuery.is('barbeiro_id', null);
+    const { data: ocupados, error: e3 } = await conflitosQuery;
     if (e3) throw e3;
-    if (ocupado) return json(res, 409, { erro: 'Esse horário acabou de ser reservado. Escolha outro horário.' });
+
+    const start = toMinutes(hora_inicio);
+    const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
+    const ocupado = (ocupados || []).find(a => {
+      const busyStart = toMinutes(String(a.hora_inicio).slice(0, 5));
+      const busyEnd = a.hora_fim ? toMinutes(String(a.hora_fim).slice(0, 5)) : busyStart + Number(normalizeServico(a.servicos || {}).duracao_minutos || loja.intervalo_minutos || 30);
+      return overlaps(start, end, busyStart, busyEnd);
+    });
+
+    if (ocupado) return json(res, 409, { erro: 'Esse horário conflita com outro agendamento. Escolha outro horário.' });
 
     let clienteId = null;
     const { data: clienteExistente } = await supabaseAdmin
       .from('clientes')
       .select('id')
-      .eq('barbearia_id', barbearia.id)
-      .eq('whatsapp', cliente_whatsapp)
+      .eq('barbearia_id', loja.id)
+      .eq('telefone', cliente_whatsapp)
       .maybeSingle();
 
     if (clienteExistente?.id) {
@@ -103,7 +129,7 @@ export default async function handler(req, res) {
     } else {
       const { data: novoCliente, error: e4 } = await supabaseAdmin
         .from('clientes')
-        .insert({ barbearia_id: barbearia.id, nome: cliente_nome, whatsapp: cliente_whatsapp })
+        .insert({ barbearia_id: loja.id, nome: cliente_nome, telefone: cliente_whatsapp })
         .select('id')
         .single();
       if (e4) throw e4;
@@ -113,29 +139,33 @@ export default async function handler(req, res) {
     const { data: agendamento, error: e5 } = await supabaseAdmin
       .from('agendamentos')
       .insert({
-        barbearia_id: barbearia.id,
+        barbearia_id: loja.id,
         servico_id,
         barbeiro_id,
         cliente_id: clienteId,
-        cliente_nome,
-        cliente_whatsapp,
         data_agendamento,
         hora_inicio,
-        observacoes,
+        hora_fim: toTime(end),
+        observacao: observacoes,
         status: 'pendente'
       })
       .select('*')
       .single();
     if (e5) throw e5;
+    const agendamentoView = normalizeAgendamento({
+      ...agendamento,
+      clientes: { nome: cliente_nome, telefone: cliente_whatsapp },
+      servicos: servicoNorm
+    });
 
-    const whats = await getWhatsapp(barbearia.id);
+    const whats = await getWhatsapp(loja.id);
     const avisos = [];
 
     if (whats) {
       const textoCliente = msgClienteRecebido({
-        barbearia,
+        barbearia: loja,
         cliente_nome,
-        servico_nome: servico.nome,
+        servico_nome: servicoNorm.nome,
         barbeiro_nome: barbeiro?.nome,
         data_agendamento,
         hora_inicio,
@@ -149,18 +179,18 @@ export default async function handler(req, res) {
           number: cliente_whatsapp,
           text: textoCliente
         });
-        await logWhatsapp({ barbearia_id: barbearia.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'enviado', retorno });
+        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'enviado', retorno });
         avisos.push('cliente');
       } catch (err) {
-        await logWhatsapp({ barbearia_id: barbearia.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'erro', erro: err.message });
+        await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_agendamento_recebido', texto: textoCliente, status: 'erro', erro: err.message });
       }
 
-      if (barbearia.whatsapp_dono) {
+      if (loja.whatsapp_dono) {
         const textoDono = msgDonoNovo({
-          barbearia,
+          barbearia: loja,
           cliente_nome,
           cliente_whatsapp,
-          servico_nome: servico.nome,
+          servico_nome: servicoNorm.nome,
           barbeiro_nome: barbeiro?.nome,
           data_agendamento,
           hora_inicio,
@@ -171,18 +201,18 @@ export default async function handler(req, res) {
             apiUrl: whats.evolution_api_url,
             apiKey: whats.evolution_api_key,
             instanceName: whats.instance_name,
-            number: barbearia.whatsapp_dono,
+            number: loja.whatsapp_dono,
             text: textoDono
           });
-          await logWhatsapp({ barbearia_id: barbearia.id, agendamento_id: agendamento.id, destino: barbearia.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'enviado', retorno });
+          await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: loja.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'enviado', retorno });
           avisos.push('dono');
         } catch (err) {
-          await logWhatsapp({ barbearia_id: barbearia.id, agendamento_id: agendamento.id, destino: barbearia.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'erro', erro: err.message });
+          await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: loja.whatsapp_dono, tipo: 'dono_novo_agendamento', texto: textoDono, status: 'erro', erro: err.message });
         }
       }
     }
 
-    return json(res, 201, { sucesso: true, agendamento, avisos_enviados: avisos });
+    return json(res, 201, { sucesso: true, agendamento: agendamentoView, avisos_enviados: avisos });
   } catch (err) {
     return json(res, err.status || 500, { erro: err.message });
   }

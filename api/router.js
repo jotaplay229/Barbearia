@@ -14,6 +14,7 @@ import ownerWhatsapp from '../server/owner-whatsapp.js';
 import publicBarbearia from '../server/public-barbearia.js';
 import saasBarbearias from '../server/saas-barbearias.js';
 import saasDashboard from '../server/saas-dashboard.js';
+import saasOwners from '../server/saas-owners.js';
 
 const routes = {
   'agendamentos': agendamentos,
@@ -31,7 +32,8 @@ const routes = {
   'owner-whatsapp': ownerWhatsapp,
   'public-barbearia': publicBarbearia,
   'saas-barbearias': saasBarbearias,
-  'saas-dashboard': saasDashboard
+  'saas-dashboard': saasDashboard,
+  'saas-owners': saasOwners
 };
 
 export default async function handler(req, res) {

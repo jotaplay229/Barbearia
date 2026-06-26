@@ -84,9 +84,9 @@ async function init(){try{token=readStoredToken();if(token)await loadMe()}catch(
 function request(route,opt={},params={}){if(demo)return fakeApi(route,opt,params);const headers={'Content-Type':'application/json',...(opt.headers||{})};if(token)headers.Authorization='Bearer '+token;return getJson(apiUrl(route,params),{...opt,headers})}
 async function loginFn(){showErr('');try{loginBtn.textContent='Entrando...';const data=await request('auth-login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value,area:'owner'})});token=data.access_token;saveStoredToken(token);await loadMe()}catch(e){showErr(e.message||'Não foi possível entrar.')}finally{loginBtn.textContent='Entrar agora'}}
 async function logout(){saveStoredToken('');location.reload()}
-async function loadMe(){try{const j=await request('owner-me');me=j.user;barbearia=j.barbearia||demoBarb;openApp()}catch(e){showErr('Login feito, mas não encontrei uma barbearia ligada a esse usuário. No Super Admin, crie a barbearia com owner_user_id desse usuário. Detalhe: '+e.message)}}
+async function loadMe(){try{const j=await request('owner-me');me=j.user;barbearia=j.barbearia||demoBarb;openApp()}catch(e){showErr('Login feito, mas não encontrei uma barbearia ligada a esse usuário. No Super Admin, crie a conta e a barbearia usando o e-mail desse dono. Detalhe: '+e.message)}}
 function demoMode(){demo=true;barbearia=demoBarb;openApp()}
-function openApp(){loginView.style.display='none';appView.classList.add('show');brandName.textContent=barbearia.nome||'Barbearia';if(barbearia.logo_url)logoBox.innerHTML=`<img src="${esc(barbearia.logo_url)}" alt="Logo">`;publicLink.textContent='/agendar?slug='+(barbearia.slug||'barbearia-teste');render()}
+function openApp(){loginView.style.display='none';appView.classList.add('show');brandName.textContent=barbearia.nome||'Barbearia';if(barbearia.logo_url)logoBox.innerHTML=`<img src="${esc(barbearia.logo_url)}" alt="Logo">`;publicLink.textContent='/b/'+(barbearia.slug||'barbearia-teste');render()}
 function page(p){current=p;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));title.textContent={dash:'Dashboard',agenda:'Agenda',servicos:'Serviços',barbeiros:'Barbeiros',config:'Configurações',whatsapp:'WhatsApp próprio'}[p]||p;render()}
 function showErr(msg){loginErr.textContent=msg||'';loginErr.classList.toggle('show',!!msg)}
 function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -208,7 +208,7 @@ async function logoutWhats(){
   setWres(j);
   if(!j.erro) toast('WhatsApp desconectado');
 }
-function copyPublicLink(){navigator.clipboard?.writeText(location.origin+'/agendar?slug='+(barbearia?.slug||'barbearia-teste'));toast('Link copiado!')}
+function copyPublicLink(){navigator.clipboard?.writeText(location.origin+'/b/'+(barbearia?.slug||'barbearia-teste'));toast('Link copiado!')}
 async function fakeApi(route,opt,params){await new Promise(r=>setTimeout(r,180));if(route==='owner-me')return{user:{email:'demo@barberos.com'},barbearia:demoBarb};if(route==='owner-agenda')return{agendamentos:demoAgenda};if(route==='owner-servicos')return{servicos:[{nome:'Corte degradê',duracao_minutos:30,preco_cents:3500,ativo:true},{nome:'Corte + Barba',duracao_minutos:60,preco_cents:6500,ativo:true},{nome:'Barba completa',duracao_minutos:30,preco_cents:3000,ativo:true}]};if(route==='owner-barbeiros')return{barbeiros:[{nome:'Rafael Santos',ativo:true},{nome:'Bruno Lima',ativo:true},{nome:'Gabriel Costa',ativo:true}]};if(route==='owner-settings')return{barbearia:demoBarb,horarios:[]};if(route==='owner-whatsapp')return{whatsapp:{evolution_api_url:'',instance_name:'',evolution_api_key:''}};return{ok:true}}
 pass?.addEventListener('keydown',e=>{if(e.key==='Enter')loginFn()});
 init();
