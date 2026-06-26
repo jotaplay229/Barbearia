@@ -147,7 +147,13 @@ async function renderWhatsapp(){
 function setWres(obj){
   if(!window.wres) return;
   if(typeof obj==='string') wres.textContent=obj;
+  else if(obj?.erro) wres.textContent=obj.erro;
   else wres.textContent=JSON.stringify(obj,null,2);
+}
+
+function showQrError(msg){
+  qrState.textContent='erro';
+  qrBox.innerHTML=`<div style="text-align:center;color:var(--muted);padding:24px"><b style="color:#fff">Nao foi possivel gerar o QR</b><br><span style="font-size:12px;line-height:1.6">${esc(msg||'Confira a configuracao da Evolution na Vercel.')}</span></div>`;
 }
 
 function renderQr(qr){
@@ -175,15 +181,19 @@ async function generateQr(){
   qrBox.innerHTML='<div style="text-align:center;color:var(--muted)"><div class="logoMark" style="margin:0 auto 14px;width:68px;height:68px;border-radius:24px;font-size:30px;animation:phoneFloat 1.4s ease-in-out infinite">✂</div><b style="color:#fff">Gerando QR Code...</b><br><span>criando/conectando instância Evolution</span></div>';
   const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'save-and-qrcode',number:testnum.value,ativo:true})}).catch(e=>({erro:e.message}));
   setWres(j);
-  if(j.qrcode) renderQr(j.qrcode); else qrState.textContent='erro';
-  if(!j.erro) toast('QR Code gerado');
+  if(j.qrcode) {
+    renderQr(j.qrcode);
+    toast('QR Code gerado');
+  } else {
+    showQrError(j.erro || j.message || 'A Evolution nao retornou QR Code.');
+  }
 }
 
 async function refreshQr(){
   qrState.textContent='atualizando...';
   const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'refresh-qrcode',number:testnum.value})}).catch(e=>({erro:e.message}));
   setWres(j);
-  if(j.qrcode) renderQr(j.qrcode); else qrState.textContent='erro';
+  if(j.qrcode) renderQr(j.qrcode); else showQrError(j.erro || j.message || 'A Evolution nao retornou QR Code.');
 }
 
 async function testWhats(){
