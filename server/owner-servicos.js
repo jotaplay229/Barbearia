@@ -1,7 +1,22 @@
 import { json, method, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
-import { normalizeServico } from '../lib/db-compat.js';
+import { normalizeServico, serviceMetaDescription } from '../lib/db-compat.js';
+
+function servicePayload(body) {
+  const b = body || {};
+  return {
+    nome: safeString(b.nome),
+    descricao: serviceMetaDescription({
+      descricao: b.descricao,
+      imagem_url: b.imagem_url,
+      precos_barbeiro: b.precos_barbeiro
+    }),
+    preco: Number(b.preco_cents || 0) / 100,
+    duracao_min: Number(b.duracao_minutos || 30),
+    ativo: b.ativo !== false
+  };
+}
 
 export default async function handler(req, res) {
   if (!method(req, res, ['GET', 'POST', 'PUT', 'DELETE'])) return;
@@ -18,11 +33,7 @@ export default async function handler(req, res) {
       const b = req.body || {};
       const { data, error } = await supabaseAdmin.from('servicos').insert({
         barbearia_id: barbearia.id,
-        nome: safeString(b.nome),
-        descricao: safeString(b.descricao),
-        preco: Number(b.preco_cents || 0) / 100,
-        duracao_min: Number(b.duracao_minutos || 30),
-        ativo: b.ativo !== false
+        ...servicePayload(b)
       }).select('*').single();
       if (error) throw error;
       return json(res, 201, { sucesso: true, servico: normalizeServico(data) });
@@ -33,13 +44,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'PUT') {
       const b = req.body || {};
-      const { data, error } = await supabaseAdmin.from('servicos').update({
-        nome: safeString(b.nome),
-        descricao: safeString(b.descricao),
-        preco: Number(b.preco_cents || 0) / 100,
-        duracao_min: Number(b.duracao_minutos || 30),
-        ativo: b.ativo !== false
-      }).eq('id', id).eq('barbearia_id', barbearia.id).select('*').single();
+      const { data, error } = await supabaseAdmin.from('servicos').update(servicePayload(b)).eq('id', id).eq('barbearia_id', barbearia.id).select('*').single();
       if (error) throw error;
       return json(res, 200, { sucesso: true, servico: normalizeServico(data) });
     }

@@ -1,6 +1,6 @@
 import { json, method, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { normalizeBarbearia, normalizeServico } from '../lib/db-compat.js';
+import { normalizeBarbearia, normalizeServico, serviceForBarber } from '../lib/db-compat.js';
 
 function toMinutes(t) {
   const [h, m] = String(t || '00:00').split(':').map(Number);
@@ -55,7 +55,8 @@ export default async function handler(req, res) {
       .eq('barbearia_id', loja.id)
       .eq('ativo', true)
       .maybeSingle();
-    const servicoNorm = normalizeServico(servico || {});
+    const servicoNorm = serviceForBarber(servico || {}, barbeiroId);
+    if (servicoNorm.disponivel_para_barbeiro === false) return json(res, 200, { horarios: [] });
     const duracao = Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
     const intervalo = Number(loja.intervalo_minutos || 30);
 

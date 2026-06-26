@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
 import { sendText } from '../lib/evolution.js';
 import { msgClienteConfirmado } from '../lib/messages.js';
-import { normalizeAgendamento, normalizeBarbearia, normalizeServico, whatsappLogPayload } from '../lib/db-compat.js';
+import { normalizeAgendamento, normalizeBarbearia, normalizeServico, serviceForBarber, whatsappLogPayload } from '../lib/db-compat.js';
 
 function toMinutes(t) {
   const [h, m] = String(t || '00:00').split(':').map(Number);
@@ -56,7 +56,10 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (servicoError) throw servicoError;
       if (!servico) return json(res, 404, { erro: 'Servico nao encontrado.' });
-      const servicoNorm = normalizeServico(servico);
+      const servicoNorm = serviceForBarber(servico, barbeiro_id);
+      if (servicoNorm.disponivel_para_barbeiro === false) {
+        return json(res, 400, { erro: 'Esse serviço não está disponível para o profissional escolhido.' });
+      }
 
       let barbeiro = null;
       if (barbeiro_id) {
