@@ -12,10 +12,21 @@ function cleanTimes(value) {
 }
 
 function cleanCustomHours(value) {
-  const out = {};
   const source = value && typeof value === 'object' ? value : {};
+  const out = { global: {}, por_barbeiro: {} };
+  const globalSource = source.global && typeof source.global === 'object' ? source.global : source;
   for (let d = 0; d <= 6; d++) {
-    out[d] = cleanTimes(source[d] || source[String(d)] || []);
+    const slots = cleanTimes(globalSource[d] || globalSource[String(d)] || []);
+    out.global[d] = slots;
+    out[d] = slots;
+  }
+  const barberSource = source.por_barbeiro && typeof source.por_barbeiro === 'object' ? source.por_barbeiro : {};
+  for (const [barbeiroId, dias] of Object.entries(barberSource)) {
+    if (!dias || typeof dias !== 'object') continue;
+    out.por_barbeiro[barbeiroId] = {};
+    for (let d = 0; d <= 6; d++) {
+      out.por_barbeiro[barbeiroId][d] = cleanTimes(dias[d] || dias[String(d)] || []);
+    }
   }
   return out;
 }

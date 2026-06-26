@@ -114,14 +114,34 @@ export default async function handler(req, res) {
         .single();
       if (error) throw error;
 
+      const agView = normalizeAgendamento({
+        ...agendamento,
+        clientes: { nome: cliente_nome, telefone: cliente_whatsapp },
+        servicos: servicoNorm,
+        barbeiros: barbeiro
+      });
+      if ((safeString(body.status) || 'confirmado') === 'confirmado') {
+        const { data: whats } = await supabaseAdmin.from('barbearia_whatsapp').select('*').eq('barbearia_id', loja.id).eq('ativo', true).maybeSingle();
+        if (whats) {
+          const texto = msgClienteConfirmado({
+            barbearia: loja,
+            cliente_nome,
+            servico_nome: servicoNorm.nome,
+            data_agendamento,
+            hora_inicio: String(hora_inicio).slice(0, 5)
+          });
+          try {
+            const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: cliente_whatsapp, text: texto });
+            await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_confirmado', texto, status: 'enviado', retorno }));
+          } catch (err) {
+            await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_confirmado', texto, status: 'erro', erro: err.message }));
+          }
+        }
+      }
+
       return json(res, 201, {
         sucesso: true,
-        agendamento: normalizeAgendamento({
-          ...agendamento,
-          clientes: { nome: cliente_nome, telefone: cliente_whatsapp },
-          servicos: servicoNorm,
-          barbeiros: barbeiro
-        })
+        agendamento: agView
       });
     }
 
