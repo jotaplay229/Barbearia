@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     if (process.env.CRON_SECRET && req.query.secret !== process.env.CRON_SECRET) {
       return json(res, 401, {
         erro: 'Cron nao autorizado.',
-        detalhe: 'Adicione ?secret=SUA_CHAVE no final da URL do cron.'
+        detalhe: 'Use /api/cron-lembretes?secret=O_VALOR_DO_CRON_SECRET. Esse valor precisa ser igual ao CRON_SECRET cadastrado na Vercel.'
       });
     }
 
