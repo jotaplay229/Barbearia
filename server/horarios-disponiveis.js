@@ -88,7 +88,6 @@ export default async function handler(req, res) {
     if (customSlots.length) {
       for (const t of customSlots) {
         const m = toMinutes(t);
-        if (m < open || m + duracao > close) continue;
         if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
       }
     } else {

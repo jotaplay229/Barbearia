@@ -23,6 +23,12 @@ function dayOfWeek(dateStr) {
   const [y, m, d] = String(dateStr || '').split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
+function customSlotsForDay(loja, dow) {
+  const slots = loja.horarios_custom?.[dow] || loja.horarios_custom?.[String(dow)] || [];
+  return Array.isArray(slots)
+    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(t => /^\d{2}:\d{2}$/.test(t)))].sort()
+    : [];
+}
 
 async function getWhatsapp(barbeariaId) {
   const { data, error } = await supabaseAdmin
@@ -129,10 +135,17 @@ export default async function handler(req, res) {
     if (!horario || !horario.ativo) {
       return json(res, 400, { erro: 'A barbearia nao atende nesse dia.' });
     }
-    const open = toMinutes(horario.abre);
-    const close = toMinutes(horario.fecha);
-    if (start < open || end > close) {
-      return json(res, 400, { erro: `Escolha um horario entre ${String(horario.abre).slice(0, 5)} e ${String(horario.fecha).slice(0, 5)}.` });
+    const customSlots = customSlotsForDay(loja, dow);
+    if (customSlots.length) {
+      if (!customSlots.includes(hora_inicio)) {
+        return json(res, 400, { erro: 'Escolha um dos horarios disponiveis.' });
+      }
+    } else {
+      const open = toMinutes(horario.abre);
+      const close = toMinutes(horario.fecha);
+      if (start < open || end > close) {
+        return json(res, 400, { erro: `Escolha um horario entre ${String(horario.abre).slice(0, 5)} e ${String(horario.fecha).slice(0, 5)}.` });
+      }
     }
 
     const ocupado = (ocupados || []).find(a => {
