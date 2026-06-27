@@ -4,6 +4,10 @@ import { sendText } from '../lib/evolution.js';
 import { msgClienteLembrete } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '../lib/db-compat.js';
 
+const REMINDER_TYPE = 'lembrete_30m';
+const REMINDER_MINUTES_MIN = 25;
+const REMINDER_MINUTES_MAX = 35;
+
 function saoPauloParts(d) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
@@ -29,8 +33,30 @@ function hhmm(d) {
   return `${p.hour}:${p.minute}`;
 }
 
-function plusHours(h) {
-  return new Date(Date.now() + h * 60 * 60 * 1000);
+function plusMinutes(min, now = new Date()) {
+  return new Date(now.getTime() + min * 60 * 1000);
+}
+
+function appointmentDate(data, hora) {
+  const time = String(hora || '').slice(0, 5);
+  return new Date(`${data}T${time}:00-03:00`);
+}
+
+function minutesUntilAppointment(ag, now) {
+  const agView = normalizeAgendamento(ag);
+  const startAt = appointmentDate(agView.data_agendamento, agView.hora_inicio);
+  return Math.round((startAt.getTime() - now.getTime()) / 60000);
+}
+
+function authSecret(req) {
+  const auth = req.headers.authorization || req.headers.Authorization || '';
+  return String(auth).startsWith('Bearer ') ? String(auth).replace('Bearer ', '').trim() : '';
+}
+
+function authorized(req) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return true;
+  return req.query.secret === expected || authSecret(req) === expected;
 }
 
 async function sendReminder(ag, whats, tipo) {
@@ -46,7 +72,7 @@ async function sendReminder(ag, whats, tipo) {
   try {
     const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: agView.cliente_whatsapp, text: texto });
     await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo, texto, status: 'enviado', retorno }));
-    if (tipo === 'lembrete_2h' && ag.status === 'confirmado') {
+    if (tipo === REMINDER_TYPE && ['confirmado', 'pendente'].includes(String(ag.status || '').toLowerCase())) {
       await supabaseAdmin.from('agendamentos').update({ status: 'aguardando_confirmacao_cliente' }).eq('id', ag.id);
     }
     return true;
@@ -72,43 +98,76 @@ async function reminderAlreadySent(agendamentoId, tipo) {
 export default async function handler(req, res) {
   if (!method(req, res, ['GET'])) return;
   try {
-    if (process.env.CRON_SECRET && req.query.secret !== process.env.CRON_SECRET) {
+    if (!authorized(req)) {
       return json(res, 401, {
         erro: 'Cron nao autorizado.',
-        detalhe: 'Use /api/cron-lembretes?secret=O_VALOR_DO_CRON_SECRET. Esse valor precisa ser igual ao CRON_SECRET cadastrado na Vercel.'
+        detalhe: 'Use /api/cron-lembretes?secret=O_VALOR_DO_CRON_SECRET ou deixe a Vercel chamar o cron com o header Authorization.'
       });
     }
 
-    const target24 = plusHours(24);
-    const target2 = plusHours(2);
-    const windows = [
-      { tipo: 'lembrete_24h', data: dateOnly(target24), hora: hhmm(target24) },
-      { tipo: 'lembrete_2h', data: dateOnly(target2), hora: hhmm(target2) }
-    ];
+    const now = new Date();
+    const dates = [...new Set([
+      dateOnly(plusMinutes(REMINDER_MINUTES_MIN, now)),
+      dateOnly(plusMinutes(REMINDER_MINUTES_MAX, now))
+    ])];
 
     let enviados = 0;
     let encontrados = 0;
+    let jaEnviados = 0;
+    let semWhatsapp = 0;
+    let semTelefone = 0;
+    let foraDaJanela = 0;
 
-    for (const w of windows) {
-      const { data: ags, error } = await supabaseAdmin
-        .from('agendamentos')
-        .select('*,clientes(nome,telefone),servicos(*),barbearias(*)')
-        .eq('data_agendamento', w.data)
-        .gte('hora_inicio', w.hora)
-        .lte('hora_inicio', w.hora.slice(0, 3) + '59')
-        .in('status', ['confirmado', 'pendente']);
-      if (error) throw error;
+    const { data: ags, error } = await supabaseAdmin
+      .from('agendamentos')
+      .select('*,clientes(nome,telefone),servicos(*),barbearias(*)')
+      .in('data_agendamento', dates)
+      .in('status', ['confirmado', 'pendente']);
+    if (error) throw error;
 
-      for (const ag of ags || []) {
-        encontrados++;
-        if (await reminderAlreadySent(ag.id, w.tipo)) continue;
-        const { data: whats } = await supabaseAdmin.from('barbearia_whatsapp').select('*').eq('barbearia_id', ag.barbearia_id).eq('ativo', true).maybeSingle();
-        if (!whats) continue;
-        if (await sendReminder(ag, whats, w.tipo)) enviados++;
+    for (const ag of ags || []) {
+      const minutesUntil = minutesUntilAppointment(ag, now);
+      if (minutesUntil < REMINDER_MINUTES_MIN || minutesUntil > REMINDER_MINUTES_MAX) {
+        foraDaJanela++;
+        continue;
       }
+      encontrados++;
+
+      const agView = normalizeAgendamento(ag);
+      if (!agView.cliente_whatsapp) {
+        semTelefone++;
+        continue;
+      }
+      if (await reminderAlreadySent(ag.id, REMINDER_TYPE)) {
+        jaEnviados++;
+        continue;
+      }
+
+      const { data: whats } = await supabaseAdmin
+        .from('barbearia_whatsapp')
+        .select('*')
+        .eq('barbearia_id', ag.barbearia_id)
+        .eq('ativo', true)
+        .maybeSingle();
+      if (!whats) {
+        semWhatsapp++;
+        continue;
+      }
+      if (await sendReminder(ag, whats, REMINDER_TYPE)) enviados++;
     }
 
-    return json(res, 200, { sucesso: true, encontrados, enviados });
+    return json(res, 200, {
+      sucesso: true,
+      tipo: REMINDER_TYPE,
+      janela_minutos: `${REMINDER_MINUTES_MIN}-${REMINDER_MINUTES_MAX}`,
+      datas_verificadas: dates,
+      encontrados,
+      enviados,
+      ja_enviados: jaEnviados,
+      sem_whatsapp: semWhatsapp,
+      sem_telefone: semTelefone,
+      fora_da_janela: foraDaJanela
+    });
   } catch (err) {
     return json(res, err.status || 500, { erro: err.message });
   }

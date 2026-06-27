@@ -18,6 +18,12 @@
 - Agenda publica: `/b/slug-da-barbearia`
 - Cron de lembretes: `/api/cron-lembretes?secret=SUA_CHAVE`
 
+## Lembrete de 30 minutos
+
+O endpoint `/api/cron-lembretes?secret=SUA_CHAVE` envia a mensagem para o cliente quando faltam cerca de 30 minutos para o horario marcado.
+
+Para funcionar sozinho, chame esse link a cada 5 minutos usando um agendador externo, como cron-job.org, UptimeRobot ou GitHub Actions. No plano Hobby da Vercel, o cron interno nao e indicado para lembrete de 30 minutos porque nao roda com essa frequencia.
+
 ## Observacoes
 
 - A Evolution API fica nas variaveis da Vercel: `EVOLUTION_API_URL` e `EVOLUTION_API_KEY`.
