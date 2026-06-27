@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       logo_url: safeString(body.logo_url),
       telefone_whatsapp: normalizePhoneBR(body.whatsapp_dono),
       endereco: safeString(body.endereco),
-      descricao: storeMetaDescription({ descricao: safeString(body.descricao, loja.descricao), horarios_custom: horariosCustom }),
+      descricao: storeMetaDescription({ descricao: safeString(body.descricao, loja.descricao), horarios_custom: horariosCustom, financeiro: loja.financeiro }),
       intervalo_minutos: Math.max(1, Number(body.intervalo_minutos || loja.intervalo_minutos || 30)),
       cor_principal: safeString(body.cor_primaria, '#ffffff')
     };

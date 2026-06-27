@@ -7,6 +7,7 @@ import evolutionWebhook from '../server/evolution-webhook.js';
 import horariosDisponiveis from '../server/horarios-disponiveis.js';
 import ownerAgenda from '../server/owner-agenda.js';
 import ownerBarbeiros from '../server/owner-barbeiros.js';
+import ownerFinance from '../server/owner-finance.js';
 import ownerMe from '../server/owner-me.js';
 import ownerServicos from '../server/owner-servicos.js';
 import ownerSettings from '../server/owner-settings.js';
@@ -26,6 +27,7 @@ const routes = {
   'horarios-disponiveis': horariosDisponiveis,
   'owner-agenda': ownerAgenda,
   'owner-barbeiros': ownerBarbeiros,
+  'owner-finance': ownerFinance,
   'owner-me': ownerMe,
   'owner-servicos': ownerServicos,
   'owner-settings': ownerSettings,
