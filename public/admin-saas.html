@@ -134,7 +134,7 @@ function renderLojas(){
   <div class="grid3">${arr.map(storeCard).join('')||'<div class="empty">Nenhuma loja encontrada.</div>'}</div>`;
 }
 
-function storeCard(b){return `<article class="storeCard"><div class="storeTop"><div class="storeName"><div class="storeIcon">B</div><div><b>${esc(b.nome)}</b><small>${esc(b.slug)}</small></div></div>${statusPill(b.status)}</div><div class="meta"><span>Dono: ${esc(b.owner?.nome||'-')}</span><span>E-mail: ${esc(b.owner?.email||'-')}</span><span>Hoje: ${b.agendamentos_hoje||0} agendamentos</span><span>${b.aberta?'Aberta agora':'Fechada agora'} · ${b.whatsapp_conectado?'WhatsApp conectado':b.whatsapp_configurado?'WhatsApp pendente':'Sem WhatsApp'}</span></div><div class="actions"><a class="btn small" href="${publicLink(b.slug)}" target="_blank" rel="noopener">Loja</a><button class="btn small" onclick="openStoreModal('${esc(b.id)}')">Editar</button><button class="btn small" onclick="openOwnerModal('${esc(b.owner_user_id)}')">Dono</button><button class="btn small danger" onclick="setStatus('${esc(b.id)}','${b.status==='ativa'?'suspensa':'ativa'}')">${b.status==='ativa'?'Desativar':'Ativar'}</button></div></article>`}
+function storeCard(b){return `<article class="storeCard"><div class="storeTop"><div class="storeName"><div class="storeIcon">B</div><div><b>${esc(b.nome)}</b><small>${esc(b.slug)}</small></div></div>${statusPill(b.status)}</div><div class="meta"><span>Dono: ${esc(b.owner?.nome||'-')}</span><span>E-mail: ${esc(b.owner?.email||'-')}</span><span>Hoje: ${b.agendamentos_hoje||0} agendamentos</span><span>${b.aberta?'Aberta agora':'Fechada agora'} · ${b.whatsapp_conectado?'WhatsApp conectado':b.whatsapp_configurado?'WhatsApp pendente':'Sem WhatsApp'}</span></div><div class="actions"><a class="btn small" href="${publicLink(b.slug)}" target="_blank" rel="noopener">Loja</a><button class="btn small" onclick="openStoreModal('${esc(b.id)}')">Editar</button><button class="btn small" onclick="openOwnerModal('${esc(b.owner_user_id)}')">Dono</button><button class="btn small danger" onclick="setStatus('${esc(b.id)}','${b.status==='ativa'?'suspensa':'ativa'}')">${b.status==='ativa'?'Desativar':'Ativar'}</button><button class="btn small danger" onclick="openDeleteStoreModal('${esc(b.id)}')">Excluir</button></div></article>`}
 
 function renderMonitor(){
   const arr=filteredStores();
@@ -177,6 +177,29 @@ async function saveStore(id){await request('saas-barbearias',{method:'PATCH',bod
 function openOwnerModal(userId){const d=findOwner(userId);if(!d)return;openModal('Alterar dono',`<div class="formgrid one"><div class="field"><label>Nome</label><input class="inp" id="ownerNome" value="${esc(d.nome||'')}"></div><div class="field"><label>E-mail</label><input class="inp" id="ownerEmail" value="${esc(d.email||'')}"></div><div class="field"><label>Nova senha</label><div class="passWrap"><input class="inp" id="ownerPass" type="password" placeholder="deixe vazio para manter"><button class="eyeBtn" type="button" onclick="togglePassword('ownerPass',this)">👁</button></div></div><div class="previewBox">Loja vinculada: ${esc(d.barbearia_nome||'-')}</div></div>`,`<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn primary" onclick="saveOwner('${esc(userId)}')">Salvar</button>`)}
 async function saveOwner(userId){await request('saas-owners',{method:'PATCH',body:JSON.stringify({user_id:userId,nome:ownerNome.value,email:ownerEmail.value,password:ownerPass.value})});toast('Dono atualizado');closeModal();await load();if(current==='donos')renderDonos()}
 async function setStatus(id,status){await request('saas-barbearias',{method:'PATCH',body:JSON.stringify({status})},{id});toast('Status atualizado');await load()}
+function openDeleteStoreModal(id){
+  const b=findStore(id);
+  if(!b)return;
+  openModal('Excluir barbearia',`<div class="previewBox"><b style="color:#fff">Atenção: esta ação apaga a barbearia ${esc(b.nome)}.</b><br>Também serão removidos agendamentos, clientes, serviços, barbeiros, horários e WhatsApp vinculados a ela.</div><div class="field" style="margin-top:12px"><label>Digite o slug para confirmar</label><input class="inp" id="deleteStoreSlug" autocomplete="off" placeholder="${esc(b.slug)}"></div><div class="err" id="deleteStoreErr"></div>`,`<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn danger" onclick="deleteStore('${esc(b.id)}','${esc(b.slug)}')">Excluir barbearia</button>`);
+}
+async function deleteStore(id,slug){
+  const typed=(deleteStoreSlug.value||'').trim();
+  if(typed!==slug){
+    deleteStoreErr.textContent='Digite exatamente o slug da barbearia para confirmar.';
+    deleteStoreErr.classList.add('show');
+    return;
+  }
+  try{
+    await request('saas-barbearias',{method:'DELETE'},{id});
+    toast('Barbearia excluída');
+    closeModal();
+    await load();
+    if(current==='lojas')renderLojas();
+  }catch(e){
+    deleteStoreErr.textContent=e.message||'Não foi possível excluir.';
+    deleteStoreErr.classList.add('show');
+  }
+}
 function copyText(text){navigator.clipboard?.writeText(text);toast('Link copiado')}
 
 pass.addEventListener('keydown',e=>{if(e.key==='Enter')loginFn()});

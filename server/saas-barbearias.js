@@ -88,8 +88,56 @@ async function cleanupBarbearia(id) {
   }
 }
 
+async function deleteRowsByStore(table, id) {
+  const { error } = await supabaseAdmin.from(table).delete().eq('barbearia_id', id);
+  if (error) throw error;
+}
+
+async function deleteBarbearia(id) {
+  const { data: loja, error: findError } = await supabaseAdmin
+    .from('barbearias')
+    .select('id,nome,owner_user_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!loja) {
+    const err = new Error('Barbearia nao encontrada.');
+    err.status = 404;
+    throw err;
+  }
+
+  for (const table of [
+    'whatsapp_logs',
+    'agendamentos',
+    'clientes',
+    'barbearia_whatsapp',
+    'horarios_funcionamento',
+    'servicos',
+    'barbeiros'
+  ]) {
+    await deleteRowsByStore(table, id);
+  }
+
+  const { error: deleteError } = await supabaseAdmin.from('barbearias').delete().eq('id', id);
+  if (deleteError) throw deleteError;
+
+  if (loja.owner_user_id) {
+    const { data: otherStores, error: otherError } = await supabaseAdmin
+      .from('barbearias')
+      .select('id')
+      .eq('owner_user_id', loja.owner_user_id)
+      .limit(1);
+    if (otherError) throw otherError;
+    if (!otherStores?.length) {
+      await supabaseAdmin.auth.admin.deleteUser(loja.owner_user_id).catch(() => {});
+    }
+  }
+
+  return loja;
+}
+
 export default async function handler(req, res) {
-  if (!method(req, res, ['GET', 'POST', 'PATCH'])) return;
+  if (!method(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return;
   try {
     await requireSaasAdmin(req);
 
@@ -160,6 +208,11 @@ export default async function handler(req, res) {
 
     const id = safeString(req.query.id || req.body?.id);
     if (!id) return json(res, 400, { erro: 'ID obrigatório.' });
+    if (req.method === 'DELETE') {
+      const loja = await deleteBarbearia(id);
+      return json(res, 200, { sucesso: true, barbearia: loja });
+    }
+
     const b = req.body || {};
     const payload = barbeariaUpdatePayload({
       nome: b.nome !== undefined ? safeString(b.nome) : undefined,
