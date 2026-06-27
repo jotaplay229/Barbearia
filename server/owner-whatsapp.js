@@ -259,16 +259,34 @@ export default async function handler(req, res) {
     }
 
     if (action === 'logout') {
-      const retorno = await logoutInstance({
-        apiUrl: whats.evolution_api_url,
-        apiKey: whats.evolution_api_key,
-        instanceName: whats.instance_name
-      });
+      let retorno = null;
+      let alreadyDisconnected = false;
+      try {
+        retorno = await logoutInstance({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name
+        });
+      } catch (err) {
+        const msg = String(err.message || '').toLowerCase();
+        if (msg.includes('not connected') || msg.includes('nao conectado') || msg.includes('n\u00e3o conectado')) {
+          alreadyDisconnected = true;
+          retorno = { aviso: 'A conexao ja estava desconectada.', detalhe: err.message };
+        } else {
+          throw err;
+        }
+      }
       await supabaseAdmin
         .from('barbearia_whatsapp')
         .update({ connected_at: null, updated_at: new Date().toISOString() })
         .eq('barbearia_id', loja.id);
-      return json(res, 200, { sucesso: true, retorno, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, {
+        sucesso: true,
+        alreadyDisconnected,
+        message: alreadyDisconnected ? 'WhatsApp ja estava desconectado.' : 'WhatsApp desconectado.',
+        retorno,
+        whatsapp: publicWhatsapp(whats)
+      });
     }
 
     if (action === 'test') {

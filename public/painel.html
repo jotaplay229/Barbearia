@@ -266,7 +266,11 @@ async function logoutWhats(){
   if(!confirm('Desconectar este WhatsApp?')) return;
   const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'logout'})}).catch(e=>({erro:e.message}));
   setWres(j);
-  if(!j.erro) toast('WhatsApp desconectado');
+  if(!j.erro){
+    qrState.textContent='desconectado';
+    qrBox.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px"><div class="logoMark" style="margin:0 auto 14px;width:68px;height:68px;border-radius:24px;font-size:30px">✂</div><b style="color:#fff">WhatsApp desconectado</b><br><span style="font-size:12px;line-height:1.6">Para conectar novamente, clique em Gerar QR Code.</span></div>';
+    toast(j.alreadyDisconnected?'WhatsApp ja estava desconectado':'WhatsApp desconectado');
+  }
 }
 function openAgendaLink(){location.href=agendaLink();}
 pass?.addEventListener('keydown',e=>{if(e.key==='Enter')loginFn()});
