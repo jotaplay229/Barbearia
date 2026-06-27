@@ -68,6 +68,12 @@ const demoData={
 function apiUrl(route, params={}){const u=new URL('/api/router', location.origin);u.searchParams.set('route', route);for(const [k,v] of Object.entries(params)){if(v!==undefined&&v!==null)u.searchParams.set(k,v)}return u.toString()}
 async function fetchJson(url, options){const resp=await fetch(url,options);const text=await resp.text();let json=null;try{json=JSON.parse(text)}catch(e){throw new Error('A API não retornou JSON. Confira se existe api/router.js e se o deploy foi atualizado.')}if(!resp.ok)throw new Error(json.erro||json.message||'Erro na API');return json}
 function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function setFavicon(url){
+  const icon=document.querySelector('link[rel="icon"]')||document.createElement('link');
+  icon.rel='icon';
+  icon.href=url||'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2218%22 fill=%22%23fff%22/%3E%3Ctext x=%2232%22 y=%2241%22 text-anchor=%22middle%22 font-size=%2234%22 font-family=%22Arial%22%3EB%3C/text%3E%3C/svg%3E';
+  document.head.appendChild(icon);
+}
 function money(c){return (Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function isoPlus(i){const d=new Date();d.setDate(d.getDate()+i);return d.toISOString().slice(0,10)}
 function brDate(d){const [y,m,dd]=String(d).split('-');return `${dd}/${m}`}
@@ -106,7 +112,7 @@ function showLoadError(e){
   bottom.classList.add('hide');
   app.innerHTML=`<section class="section"><div class="notice err"><b>Não consegui abrir essa agenda.</b><br>${esc(e.message||'Confira se o endereço está correto ou tente novamente em instantes.')}</div></section>`;
 }
-function hydrateBrand(){nome.textContent=data.barbearia?.nome||'Barbearia';document.title=`${data.barbearia?.nome||'Barbearia'} - Agendar horário`;desc.textContent=data.barbearia?.descricao||data.barbearia?.endereco||'Agende seu horário em poucos toques';statusText.textContent=usingDemo?'Modo demonstração':'Agenda online';if(data.barbearia?.logo_url){logo.innerHTML=`<img alt="Logo" src="${data.barbearia.logo_url}">`}else{logo.textContent='✂'}}
+function hydrateBrand(){nome.textContent=data.barbearia?.nome||'Barbearia';document.title=`${data.barbearia?.nome||'Barbearia'} - Agendar horário`;setFavicon(data.barbearia?.logo_url);desc.textContent=data.barbearia?.descricao||data.barbearia?.endereco||'Agende seu horário em poucos toques';statusText.textContent=usingDemo?'Modo demonstração':'Agenda online';if(data.barbearia?.logo_url){logo.innerHTML=`<img alt="Logo" src="${esc(data.barbearia.logo_url)}">`}else{logo.textContent='✂'}}
 function setSteps(){[st1,st2,st3,st4].forEach((el,i)=>{el.classList.toggle('on',i<step);el.classList.toggle('current',i===step-1)});backBtn.classList.toggle('hide',step===1);next.textContent=step===4?'Confirmar':'Continuar';next.disabled=(step===1&&!sel.barbeiro)||(step===2&&!sel.servico)||(step===3&&(!sel.data||!sel.hora));}
 function summary(){sum1.textContent=sel.servico?sel.servico.nome:(sel.barbeiro?sel.barbeiro.nome:'Escolha seu profissional');sum2.textContent=[sel.barbeiro?.nome,sel.data?brDate(sel.data):null,sel.hora].filter(Boolean).join(' · ')||'Profissional, serviço, data e hora'}
 function render(){setSteps();summary();if(step===1)renderBarbeiros();else if(step===2)renderServicos();else if(step===3)renderDataHora();else renderCliente()}

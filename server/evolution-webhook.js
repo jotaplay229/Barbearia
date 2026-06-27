@@ -1,6 +1,6 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { sendText } from '../lib/evolution.js';
+import { sendText, setInstanceSettings } from '../lib/evolution.js';
 import { msgDonoClienteConfirmou, msgDonoClienteCancelou } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '../lib/db-compat.js';
 
@@ -17,8 +17,28 @@ function extractRemoteNumber(body) {
   const jid = safeString(body?.data?.key?.remoteJid || body?.key?.remoteJid || body?.remoteJid || body?.from);
   return normalizePhoneBR(jid.split('@')[0]);
 }
+function extractCallNumber(body) {
+  const jid = safeString(
+    body?.data?.call?.from ||
+    body?.call?.from ||
+    body?.data?.from ||
+    body?.data?.key?.remoteJid ||
+    body?.key?.remoteJid ||
+    body?.remoteJid ||
+    body?.from ||
+    body?.caller
+  );
+  return normalizePhoneBR(jid.split('@')[0]);
+}
 function extractInstance(body) {
   return safeString(body?.instance || body?.data?.instance || body?.instanceName || body?.data?.instanceName);
+}
+function extractEvent(body) {
+  return safeString(body?.event || body?.type || body?.data?.event || body?.data?.type || body?.data?.messageType);
+}
+function isCallEvent(body, event) {
+  const normalized = safeString(event).toUpperCase();
+  return normalized.includes('CALL') || !!(body?.data?.call || body?.call || body?.data?.callId || body?.callId);
 }
 
 export default async function handler(req, res) {
@@ -26,12 +46,14 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {};
     const instance = extractInstance(body);
+    const event = extractEvent(body);
+    const callEvent = isCallEvent(body, event);
     const text = extractText(body).trim().toLowerCase();
-    const from = extractRemoteNumber(body);
+    const from = callEvent ? extractCallNumber(body) : extractRemoteNumber(body);
 
-    await supabaseAdmin.from('webhook_logs').insert({ evento: 'messages_upsert', payload: { instance, from, body } });
+    await supabaseAdmin.from('webhook_logs').insert({ evento: event || (callEvent ? 'call' : 'messages_upsert'), payload: { instance, from, body } });
 
-    if (!instance || !from || !text) return json(res, 200, { recebido: true, ignorado: true });
+    if (!instance || !from) return json(res, 200, { recebido: true, ignorado: true });
 
     const { data: whats, error: e1 } = await supabaseAdmin
       .from('barbearia_whatsapp')
@@ -41,6 +63,31 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (e1) throw e1;
     if (!whats) return json(res, 200, { recebido: true, ignorado: 'instance_not_found' });
+
+    if (callEvent) {
+      let settings = null;
+      try {
+        settings = await setInstanceSettings({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name
+        });
+      } catch (err) {
+        settings = { erro: err.message };
+      }
+      await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({
+        barbearia_id: whats.barbearia_id,
+        destino: from,
+        tipo: 'ligacao_recusada',
+        texto: 'Ligacao recusada automaticamente pela Evolution.',
+        status: settings?.erro ? 'erro' : 'registrado',
+        retorno: settings,
+        erro: settings?.erro
+      }));
+      return json(res, 200, { recebido: true, ligacao: true, settings });
+    }
+
+    if (!text) return json(res, 200, { recebido: true, ignorado: true });
     const loja = normalizeBarbearia(whats.barbearias || {});
 
     const { data: ag, error: e2 } = await supabaseAdmin

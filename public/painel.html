@@ -94,12 +94,18 @@ function request(route,opt={},params={}){const headers={'Content-Type':'applicat
 async function loginFn(){showErr('');try{loginBtn.textContent='Entrando...';const data=await request('auth-login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value,area:'owner'})});token=data.access_token;saveStoredToken(token);await loadMe()}catch(e){showErr(e.message||'Não foi possível entrar.')}finally{loginBtn.textContent='Entrar'}}
 async function logout(){saveStoredToken('');location.reload()}
 async function loadMe(){try{const j=await request('owner-me');me=j.user;barbearia=j.barbearia;if(!barbearia)throw new Error('sem barbearia');openApp()}catch(e){showErr('Nao encontramos uma barbearia vinculada a este acesso. Fale com o suporte.')}}
-function openApp(){loginView.style.display='none';appView.classList.add('show');brandName.textContent=barbearia.nome||'Barbearia';document.title=`${barbearia.nome||'Barbearia'} - Painel`;if(barbearia.logo_url)logoBox.innerHTML=`<img src="${esc(barbearia.logo_url)}" alt="Logo">`;publicLink.textContent='Agenda online';render();startLive()}
+function openApp(){loginView.style.display='none';appView.classList.add('show');brandName.textContent=barbearia.nome||'Barbearia';document.title=`${barbearia.nome||'Barbearia'} - Painel`;setFavicon(barbearia.logo_url);if(barbearia.logo_url)logoBox.innerHTML=`<img src="${esc(barbearia.logo_url)}" alt="Logo">`;else logoBox.textContent='✂';publicLink.textContent='Agenda online';render();startLive()}
 function page(p){current=p;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));title.textContent={dash:'Dashboard',agenda:'Agenda',financeiro:'Financeiro',servicos:'Serviços',barbeiros:'Barbeiros',config:'Configurações',whatsapp:'WhatsApp próprio'}[p]||p;render()}
 function startLive(){if(liveTimer)clearInterval(liveTimer);liveTimer=setInterval(()=>{if(!barbearia)return;if(current==='dash')renderDash(true).catch(()=>{});if(current==='agenda'&&document.getElementById('agendaDate'))loadAgendaDate(true).catch(()=>{})},4000)}
 function showErr(msg){loginErr.textContent=msg||'';loginErr.classList.toggle('show',!!msg)}
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const show=el.type==='password';el.type=show?'text':'password';btn.textContent=show?'✕':'👁'}
 function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function setFavicon(url){
+  const icon=document.querySelector('link[rel="icon"]')||document.createElement('link');
+  icon.rel='icon';
+  icon.href=url||'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2218%22 fill=%22%23fff%22/%3E%3Ctext x=%2232%22 y=%2241%22 text-anchor=%22middle%22 font-size=%2234%22 font-family=%22Arial%22%3EB%3C/text%3E%3C/svg%3E';
+  document.head.appendChild(icon);
+}
 function money(c){return (Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function toast(msg='Salvo com sucesso!'){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
 function agendaLink(){return location.origin+'/agendar?slug='+encodeURIComponent(barbearia?.slug||'')}

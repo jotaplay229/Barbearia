@@ -1,7 +1,7 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
-import { connectionState, connectInstance, createInstance, logoutInstance, maskSecret, normalizeQrPayload, sendText, setWebhook } from '../lib/evolution.js';
+import { connectionState, connectInstance, createInstance, logoutInstance, maskSecret, normalizeQrPayload, sendText, setInstanceSettings, setWebhook } from '../lib/evolution.js';
 import { normalizeBarbearia } from '../lib/db-compat.js';
 
 function appUrlFromReq(req) {
@@ -117,6 +117,21 @@ async function saveOwnerPhone(loja, number) {
   return phone;
 }
 
+async function applyCallSettings(whats) {
+  try {
+    return await setInstanceSettings({
+      apiUrl: whats.evolution_api_url,
+      apiKey: whats.evolution_api_key,
+      instanceName: whats.instance_name
+    });
+  } catch (err) {
+    return {
+      aviso: 'Nao foi possivel aplicar o bloqueio automatico de ligacoes agora.',
+      erro: err.message
+    };
+  }
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['GET', 'PUT', 'POST'])) return;
   try {
@@ -126,7 +141,8 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const data = await getWhatsapp(loja.id);
       const preview = data || buildWhatsappPayload(loja, null, {});
-      return json(res, 200, { whatsapp: publicWhatsapp(preview) });
+      const settings = data ? await applyCallSettings(data) : null;
+      return json(res, 200, { whatsapp: publicWhatsapp(preview), settings });
     }
 
     if (req.method === 'PUT') {
@@ -151,6 +167,7 @@ export default async function handler(req, res) {
     if (!whats) return json(res, 404, { erro: 'WhatsApp ainda nao configurado.' });
 
     if (action === 'status') {
+      const settings = await applyCallSettings(whats);
       const state = await connectionState({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -165,7 +182,7 @@ export default async function handler(req, res) {
           .eq('barbearia_id', loja.id);
       }
 
-      return json(res, 200, { sucesso: true, state, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, state, settings, whatsapp: publicWhatsapp(whats) });
     }
 
     if (action === 'create-instance' || action === 'qrcode' || action === 'save-and-qrcode') {
@@ -200,6 +217,8 @@ export default async function handler(req, res) {
         webhook = { erro: err.message };
       }
 
+      const settings = await applyCallSettings(whats);
+
       let connectedQr = null;
       let connectError = null;
       try {
@@ -220,6 +239,7 @@ export default async function handler(req, res) {
         message: qr?.qrDataUrl ? 'QR Code gerado. Escaneie pelo WhatsApp da barbearia.' : 'A conexao foi preparada, mas o QR Code ainda nao ficou disponivel. Tente atualizar em alguns segundos.',
         created,
         webhook,
+        settings,
         connectError,
         qrcode: qr,
         webhookUrl,
@@ -228,13 +248,14 @@ export default async function handler(req, res) {
     }
 
     if (action === 'refresh-qrcode') {
+      const settings = await applyCallSettings(whats);
       const qr = await connectInstance({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
         instanceName: whats.instance_name,
         number: safeString(body.number || loja.whatsapp_dono)
       });
-      return json(res, 200, { sucesso: true, qrcode: qr, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, qrcode: qr, settings, whatsapp: publicWhatsapp(whats) });
     }
 
     if (action === 'logout') {
@@ -251,6 +272,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'test') {
+      const settings = await applyCallSettings(whats);
       const number = safeString(body.number || loja.whatsapp_dono);
       if (!number) return json(res, 400, { erro: 'Informe um numero para teste.' });
       const retorno = await sendText({
@@ -260,7 +282,7 @@ export default async function handler(req, res) {
         number,
         text: `Teste do ${loja.nome}\n\nSeu WhatsApp esta conectado ao BarberOS.`
       });
-      return json(res, 200, { sucesso: true, retorno, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, retorno, settings, whatsapp: publicWhatsapp(whats) });
     }
 
     return json(res, 400, { erro: 'Acao invalida.' });
