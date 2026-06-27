@@ -24,12 +24,26 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const data = safeString(req.query.data) || new Date().toISOString().slice(0, 10);
-      const { data: agendamentos, error } = await supabaseAdmin
+      const from = safeString(req.query.from);
+      const to = safeString(req.query.to);
+      let query = supabaseAdmin
         .from('agendamentos')
         .select('*,clientes(nome,telefone),servicos(*),barbeiros(nome)')
-        .eq('barbearia_id', loja.id)
-        .eq('data_agendamento', data)
-        .order('hora_inicio');
+        .eq('barbearia_id', loja.id);
+
+      if (from || to) {
+        query = query
+          .gte('data_agendamento', from || data)
+          .lte('data_agendamento', to || from || data)
+          .order('data_agendamento')
+          .order('hora_inicio');
+      } else {
+        query = query
+          .eq('data_agendamento', data)
+          .order('hora_inicio');
+      }
+
+      const { data: agendamentos, error } = await query;
       if (error) throw error;
       return json(res, 200, { agendamentos: (agendamentos || []).map(normalizeAgendamento) });
     }
