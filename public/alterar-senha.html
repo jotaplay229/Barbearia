@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Alterar senha - BarberOS</title>
+  <meta name="theme-color" content="#050505">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#050505;--card:#151515;--line:#303030;--text:#f7f7f7;--muted:#a1a1a1;--ok:#4ade80;--bad:#fb7185}
+    html,body{min-height:100%}
+    body{background:#050505;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;display:grid;place-items:center;padding:24px;overflow:auto}
+    body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 20% 12%,rgba(255,255,255,.12),transparent 26%),radial-gradient(circle at 84% 18%,rgba(255,255,255,.08),transparent 28%),linear-gradient(rgba(255,255,255,.032) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.032) 1px,transparent 1px);background-size:auto,auto,54px 54px,54px 54px;z-index:-2}
+    body:after{content:"";position:fixed;right:-160px;bottom:-180px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(42px);z-index:-1}
+    .card{width:min(100%,500px);border:1px solid rgba(255,255,255,.13);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.03));border-radius:30px;padding:30px;box-shadow:0 28px 90px rgba(0,0,0,.6);backdrop-filter:blur(18px)}
+    .logo{width:62px;height:62px;border-radius:20px;background:#fff;color:#000;display:grid;place-items:center;font-size:30px;font-weight:950;margin-bottom:22px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:8px 12px;color:#d8d8d8;font-size:12px;margin-bottom:16px;background:rgba(255,255,255,.045)}
+    .pill i{width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 7px rgba(255,255,255,.08)}
+    h1{font-size:32px;line-height:1;letter-spacing:-.05em;margin-bottom:12px}
+    p{color:var(--muted);font-size:15px;line-height:1.65}
+    form{display:grid;gap:14px;margin-top:22px}
+    .field label{display:block;color:var(--muted);font-size:12px;margin-bottom:8px;font-weight:800}
+    .passWrap{position:relative}
+    .inp{width:100%;background:rgba(0,0,0,.36);border:1px solid rgba(255,255,255,.15);border-radius:17px;color:#fff;padding:15px 54px 15px 14px;outline:0;font:inherit;transition:.18s}
+    .inp:focus{border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.08)}
+    .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-weight:950}
+    .btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;text-decoration:none;border-radius:17px;padding:14px 16px;font-weight:950;display:inline-flex;align-items:center;justify-content:center;min-height:50px;cursor:pointer}
+    .btn.primary{background:#fff;color:#000;border-color:#fff}
+    .status{margin-top:16px;border:1px solid var(--line);border-radius:18px;background:rgba(0,0,0,.28);padding:13px;color:#d8d8d8;font-size:13px;line-height:1.5;display:none}
+    .status.show{display:block}
+    .status.ok{border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.09);color:#bbf7d0}
+    .status.err{border-color:rgba(251,113,133,.36);background:rgba(251,113,133,.1);color:#fecdd3}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .actions .btn{flex:1}
+    .spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.22);border-top-color:#fff;display:inline-block;animation:spin .75s linear infinite;margin-right:9px;vertical-align:-4px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">B</div>
+    <div class="pill"><i></i><span>BarberOS</span></div>
+    <h1>Alterar senha</h1>
+    <p id="intro">Digite uma nova senha para acessar o painel da barbearia.</p>
+    <form id="form" style="display:none">
+      <div class="field">
+        <label>Nova senha</label>
+        <div class="passWrap">
+          <input class="inp" id="password" type="password" autocomplete="new-password" minlength="6" placeholder="minimo 6 caracteres">
+          <button class="eye" type="button" data-target="password">👁</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirmar senha</label>
+        <div class="passWrap">
+          <input class="inp" id="password2" type="password" autocomplete="new-password" minlength="6" placeholder="repita a nova senha">
+          <button class="eye" type="button" data-target="password2">👁</button>
+        </div>
+      </div>
+      <button class="btn primary" id="submitBtn" type="submit">Salvar nova senha</button>
+    </form>
+    <div class="status show" id="status"><span class="spinner"></span>Validando link de recuperacao...</div>
+    <div class="actions">
+      <a class="btn" href="/painel">Voltar ao painel</a>
+    </div>
+  </main>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    let supabase = null;
+    const params = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const formEl = document.getElementById('form');
+    const statusEl = document.getElementById('status');
+    const introEl = document.getElementById('intro');
+    const passwordEl = document.getElementById('password');
+    const password2El = document.getElementById('password2');
+    const submitBtnEl = document.getElementById('submitBtn');
+
+    function setStatus(message, kind = '') {
+      statusEl.className = 'status show' + (kind ? ' ' + kind : '');
+      statusEl.innerHTML = message;
+    }
+
+    function saveSession(session) {
+      if (session?.access_token) {
+        try { localStorage.setItem('barberos_owner_token', session.access_token); } catch {}
+      }
+    }
+
+    async function loadConfig() {
+      const resp = await fetch('/api/config');
+      const cfg = await resp.json();
+      if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) throw new Error('Configuracao do Supabase nao encontrada.');
+      return cfg;
+    }
+
+    async function prepareSession() {
+      const cfg = await loadConfig();
+      supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true } });
+
+      const accessToken = hashParams.get('access_token') || params.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || params.get('refresh_token');
+      const tokenHash = params.get('token_hash');
+
+      if (accessToken && refreshToken) {
+        const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (error) throw error;
+        saveSession(data?.session);
+        return;
+      }
+
+      if (tokenHash) {
+        const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: params.get('type') || 'recovery' });
+        if (error) throw error;
+        saveSession(data?.session);
+        return;
+      }
+
+      throw new Error('Link de alteracao de senha incompleto ou expirado.');
+    }
+
+    function togglePassword(btn) {
+      const input = document.getElementById(btn.dataset.target);
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? '✕' : '👁';
+    }
+
+    document.querySelectorAll('.eye').forEach(btn => btn.addEventListener('click', () => togglePassword(btn)));
+
+    formEl.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const pass = passwordEl.value.trim();
+      const pass2 = password2El.value.trim();
+      if (pass.length < 6) return setStatus('A senha precisa ter pelo menos 6 caracteres.', 'err');
+      if (pass !== pass2) return setStatus('As senhas nao conferem.', 'err');
+
+      submitBtnEl.disabled = true;
+      submitBtnEl.textContent = 'Salvando...';
+      try {
+        const { data, error } = await supabase.auth.updateUser({ password: pass });
+        if (error) throw error;
+        saveSession(data?.session);
+        setStatus('Senha alterada com sucesso. Redirecionando para o painel...', 'ok');
+        setTimeout(() => { location.href = '/painel'; }, 1600);
+      } catch (err) {
+        setStatus(err.message || 'Nao foi possivel alterar a senha.', 'err');
+        submitBtnEl.disabled = false;
+        submitBtnEl.textContent = 'Salvar nova senha';
+      }
+    });
+
+    try {
+      await prepareSession();
+      statusEl.className = 'status';
+      formEl.style.display = 'grid';
+      passwordEl.focus();
+    } catch (err) {
+      introEl.textContent = 'O link pode ter expirado. Solicite uma nova recuperacao de senha.';
+      setStatus(err.message || 'Link invalido.', 'err');
+    }
+  </script>
+</body>
+</html>

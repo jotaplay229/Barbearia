@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Confirmando e-mail - BarberOS</title>
+  <meta name="theme-color" content="#050505">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#050505;--card:#151515;--card2:#1f1f1f;--line:#303030;--text:#f7f7f7;--muted:#a1a1a1;--ok:#4ade80;--bad:#fb7185}
+    html,body{min-height:100%}
+    body{background:#050505;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;display:grid;place-items:center;padding:24px;overflow:hidden}
+    body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 20% 12%,rgba(255,255,255,.12),transparent 26%),radial-gradient(circle at 84% 18%,rgba(255,255,255,.08),transparent 28%),linear-gradient(rgba(255,255,255,.032) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.032) 1px,transparent 1px);background-size:auto,auto,54px 54px,54px 54px;z-index:-2}
+    body:after{content:"";position:fixed;left:-160px;bottom:-180px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(42px);z-index:-1}
+    .card{width:min(100%,480px);border:1px solid rgba(255,255,255,.13);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.03));border-radius:30px;padding:30px;box-shadow:0 28px 90px rgba(0,0,0,.6);backdrop-filter:blur(18px)}
+    .logo{width:62px;height:62px;border-radius:20px;background:#fff;color:#000;display:grid;place-items:center;font-size:30px;font-weight:950;margin-bottom:22px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:8px 12px;color:#d8d8d8;font-size:12px;margin-bottom:16px;background:rgba(255,255,255,.045)}
+    .pill i{width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 7px rgba(255,255,255,.08)}
+    h1{font-size:32px;line-height:1;letter-spacing:-.05em;margin-bottom:12px}
+    p{color:var(--muted);font-size:15px;line-height:1.65}
+    .status{margin-top:20px;border:1px solid var(--line);border-radius:20px;background:rgba(0,0,0,.28);padding:14px;color:#d8d8d8;font-size:13px;line-height:1.5;min-height:52px}
+    .status.ok{border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.09);color:#bbf7d0}
+    .status.err{border-color:rgba(251,113,133,.36);background:rgba(251,113,133,.1);color:#fecdd3}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+    .btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;text-decoration:none;border-radius:16px;padding:13px 16px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;min-height:48px}
+    .btn.primary{background:#fff;color:#000;border-color:#fff;flex:1}
+    .spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.22);border-top-color:#fff;display:inline-block;animation:spin .75s linear infinite;margin-right:9px;vertical-align:-4px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">B</div>
+    <div class="pill"><i></i><span>BarberOS</span></div>
+    <h1 id="title">Confirmando seu e-mail</h1>
+    <p id="text">Estamos validando seu acesso para liberar o painel da barbearia.</p>
+    <div class="status" id="status"><span class="spinner"></span>Conferindo link de confirmação...</div>
+    <div class="actions">
+      <a class="btn primary" id="panelBtn" href="/painel" style="display:none">Ir para o painel</a>
+      <a class="btn" href="/">Inicio</a>
+    </div>
+  </main>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const params = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const tokenHash = params.get('token_hash');
+    const type = params.get('type') || 'email';
+    const next = params.get('next') || '/painel';
+    const titleEl = document.getElementById('title');
+    const textEl = document.getElementById('text');
+    const statusEl = document.getElementById('status');
+    const panelBtnEl = document.getElementById('panelBtn');
+
+    function setStatus(message, kind = '') {
+      statusEl.className = 'status' + (kind ? ' ' + kind : '');
+      statusEl.innerHTML = message;
+    }
+
+    function saveSession(session) {
+      if (session?.access_token) {
+        try { localStorage.setItem('barberos_owner_token', session.access_token); } catch {}
+      }
+    }
+
+    async function loadConfig() {
+      const resp = await fetch('/api/config');
+      const cfg = await resp.json();
+      if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) throw new Error('Configuracao do Supabase nao encontrada.');
+      return cfg;
+    }
+
+    async function confirmEmail() {
+      try {
+        const cfg = await loadConfig();
+        const supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true } });
+
+        if (tokenHash) {
+          const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+          if (error) throw error;
+          saveSession(data?.session);
+        } else if (hashParams.get('access_token')) {
+          saveSession({ access_token: hashParams.get('access_token') });
+        } else {
+          throw new Error('Link de confirmacao incompleto ou expirado.');
+        }
+
+        titleEl.textContent = 'E-mail confirmado';
+        textEl.textContent = 'Seu acesso foi liberado. Voce sera levado para o painel em instantes.';
+        panelBtnEl.style.display = 'inline-flex';
+        panelBtnEl.href = next;
+        setStatus('Tudo certo. Redirecionando para o painel...', 'ok');
+        setTimeout(() => { location.href = next; }, 1800);
+      } catch (err) {
+        titleEl.textContent = 'Nao foi possivel confirmar';
+        textEl.textContent = 'O link pode ter expirado ou ja ter sido usado.';
+        panelBtnEl.style.display = 'inline-flex';
+        setStatus((err.message || 'Tente pedir um novo link de acesso.'), 'err');
+      }
+    }
+
+    confirmEmail();
+  </script>
+</body>
+</html>
