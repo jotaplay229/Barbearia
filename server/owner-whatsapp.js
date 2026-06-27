@@ -117,7 +117,7 @@ async function saveOwnerPhone(loja, number) {
   return phone;
 }
 
-async function applyCallSettings(whats) {
+async function allowCalls(whats) {
   try {
     return await setInstanceSettings({
       apiUrl: whats.evolution_api_url,
@@ -126,7 +126,7 @@ async function applyCallSettings(whats) {
     });
   } catch (err) {
     return {
-      aviso: 'Nao foi possivel aplicar o bloqueio automatico de ligacoes agora.',
+      aviso: 'Nao foi possivel liberar ligacoes automaticamente agora.',
       erro: err.message
     };
   }
@@ -141,7 +141,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const data = await getWhatsapp(loja.id);
       const preview = data || buildWhatsappPayload(loja, null, {});
-      const settings = data ? await applyCallSettings(data) : null;
+      const settings = data ? await allowCalls(data) : null;
       return json(res, 200, { whatsapp: publicWhatsapp(preview), settings });
     }
 
@@ -167,7 +167,7 @@ export default async function handler(req, res) {
     if (!whats) return json(res, 404, { erro: 'WhatsApp ainda nao configurado.' });
 
     if (action === 'status') {
-      const settings = await applyCallSettings(whats);
+      const settings = await allowCalls(whats);
       const state = await connectionState({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -217,7 +217,7 @@ export default async function handler(req, res) {
         webhook = { erro: err.message };
       }
 
-      const settings = await applyCallSettings(whats);
+      const settings = await allowCalls(whats);
 
       let connectedQr = null;
       let connectError = null;
@@ -248,7 +248,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'refresh-qrcode') {
-      const settings = await applyCallSettings(whats);
+      const settings = await allowCalls(whats);
       const qr = await connectInstance({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -272,7 +272,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'test') {
-      const settings = await applyCallSettings(whats);
+      const settings = await allowCalls(whats);
       const number = safeString(body.number || loja.whatsapp_dono);
       if (!number) return json(res, 400, { erro: 'Informe um numero para teste.' });
       const retorno = await sendText({
