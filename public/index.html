@@ -3,48 +3,137 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>BarberOS • Agendamentos Para Barbearias</title>
+  <title>BarberOS | Plataforma para barbearias</title>
+  <meta name="description" content="Landing page profissional do BarberOS, sistema de agendamento e gestao para barbearias.">
   <meta name="theme-color" content="#050505">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#050505;--card:#111;--card2:#171717;--line:#282828;--line2:#3a3a3a;--text:#f5f5f5;--muted:#9a9a9a;--soft:#5d5d5d;--white:#fff;--black:#000;--green:#4ade80;--shadow:0 30px 90px rgba(0,0,0,.55);--r:28px;--r2:18px}
-    html{scroll-behavior:smooth}body{min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;overflow-x:hidden}
-    body:before{content:"";position:fixed;inset:0;z-index:-3;background:radial-gradient(circle at 15% 10%,rgba(255,255,255,.12),transparent 23%),radial-gradient(circle at 85% 8%,rgba(255,255,255,.08),transparent 25%),linear-gradient(180deg,#080808,#030303 55%,#080808)}
-    body:after{content:"";position:fixed;inset:0;z-index:-2;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(circle at center,black,transparent 72%);opacity:.5}
-    .orb{position:fixed;border-radius:999px;filter:blur(30px);opacity:.28;z-index:-1;animation:float 9s ease-in-out infinite}.orb.one{width:260px;height:260px;background:#fff;left:-120px;top:120px}.orb.two{width:220px;height:220px;background:#777;right:-90px;bottom:110px;animation-delay:-3s}@keyframes float{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(18px,-22px,0)}}
-    .nav{height:76px;display:flex;align-items:center;justify-content:space-between;max-width:1180px;margin:auto;padding:0 24px}.brand{display:flex;align-items:center;gap:12px}.mark{width:44px;height:44px;border-radius:16px;background:#fff;color:#000;display:grid;place-items:center;font-size:22px;box-shadow:0 14px 45px rgba(255,255,255,.08)}.brand b{font-size:16px}.brand span{font-size:12px;color:var(--muted);display:block;margin-top:1px}.navlinks{display:flex;gap:10px}.navlinks a{color:#d8d8d8;text-decoration:none;font-size:13px;border:1px solid transparent;border-radius:999px;padding:10px 14px}.navlinks a:hover{border-color:var(--line);background:rgba(255,255,255,.04)}.navlinks .cta{background:#fff;color:#000;font-weight:800}
-    .hero{max-width:1180px;margin:30px auto 0;padding:0 24px 54px;display:grid;grid-template-columns:1.05fr .95fr;gap:34px;align-items:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:999px;padding:8px 12px;color:#d7d7d7;font-size:12px;margin-bottom:18px;animation:rise .55s ease both}.dot{width:7px;height:7px;background:#fff;border-radius:50%;box-shadow:0 0 0 6px rgba(255,255,255,.08)}h1{font-size:clamp(38px,5.4vw,78px);line-height:.94;letter-spacing:-.065em;max-width:720px;animation:rise .65s ease both}.lead{color:#adadad;font-size:17px;line-height:1.75;max-width:620px;margin:22px 0 28px;animation:rise .75s ease both}.actions{display:flex;gap:12px;flex-wrap:wrap;animation:rise .85s ease both}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:50px;padding:0 18px;border-radius:999px;text-decoration:none;font-weight:850;font-size:14px;transition:.2s}.btn.primary{background:#fff;color:#000}.btn.ghost{border:1px solid var(--line2);color:#fff;background:rgba(255,255,255,.04)}.btn:hover{transform:translateY(-2px)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px;max-width:560px}.stat{border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);padding:14px;animation:rise .95s ease both}.stat strong{font-size:22px}.stat span{display:block;color:#858585;font-size:12px;margin-top:3px}
-    .showcase{position:relative;min-height:590px;animation:phoneIn .8s cubic-bezier(.2,.9,.2,1) both}.phone{width:min(390px,100%);min-height:680px;margin-left:auto;border:1px solid #333;border-radius:44px;background:linear-gradient(180deg,#161616,#070707);box-shadow:var(--shadow);padding:13px;position:relative;overflow:hidden}.phone:before{content:"";position:absolute;top:10px;left:50%;width:120px;height:28px;transform:translateX(-50%);border-radius:0 0 18px 18px;background:#050505;z-index:3}.screen{height:100%;border-radius:34px;background:radial-gradient(circle at top,#262626,#090909 58%);overflow:hidden;position:relative;padding:22px 17px}.miniHero{border:1px solid #333;border-radius:28px;background:linear-gradient(180deg,#1d1d1d,#101010);padding:18px;margin-top:28px;position:relative;overflow:hidden}.miniHero:after{content:"";position:absolute;inset:-40px -30px auto auto;width:180px;height:180px;background:radial-gradient(circle,rgba(255,255,255,.11),transparent 65%)}.miniTop{display:flex;gap:12px;align-items:center}.miniLogo{width:56px;height:56px;border-radius:20px;background:#fff;color:#000;display:grid;place-items:center;font-size:25px}.miniHero h3{font-size:21px;line-height:1.1}.miniHero p{color:#8e8e8e;font-size:12px;margin-top:4px}.progress{display:flex;gap:7px;margin-top:18px}.progress i{height:4px;flex:1;border-radius:999px;background:#383838;overflow:hidden}.progress i:first-child:after{content:"";display:block;width:100%;height:100%;background:#fff;animation:slide 1.9s ease-in-out infinite}.cards{margin-top:13px;display:grid;gap:10px}.miniCard{border:1px solid #313131;border-radius:20px;background:#171717;padding:13px;display:flex;align-items:center;gap:11px;animation:cardPulse 3s ease-in-out infinite}.miniCard:nth-child(2){animation-delay:.4s}.miniIcon{width:42px;height:42px;border-radius:15px;background:#fff;color:#000;display:grid;place-items:center;font-weight:900}.miniCard b{font-size:13px}.miniCard small{display:block;color:#777;margin-top:3px}.miniPrice{margin-left:auto;font-weight:900}.dock{position:absolute;left:18px;right:18px;bottom:18px;border:1px solid #313131;border-radius:24px;background:rgba(9,9,9,.78);backdrop-filter:blur(18px);padding:13px;display:flex;align-items:center;gap:10px}.dock div{flex:1}.dock b{font-size:13px}.dock span{display:block;color:#777;font-size:11px;margin-top:3px}.dock button{border:0;border-radius:16px;background:#fff;color:#000;font-weight:900;padding:13px 16px}
-    .floatCard{position:absolute;border:1px solid #333;border-radius:20px;background:rgba(17,17,17,.86);backdrop-filter:blur(20px);box-shadow:0 18px 45px rgba(0,0,0,.42);padding:14px;animation:float 6s ease-in-out infinite}.floatCard.a{left:0;top:110px}.floatCard.b{right:6px;bottom:96px;animation-delay:-2s}.floatCard strong{font-size:18px}.floatCard span{display:block;color:#888;font-size:12px;margin-top:3px}
-    .section{max-width:1180px;margin:auto;padding:28px 24px 70px}.sectionTitle{font-size:30px;letter-spacing:-.04em;margin-bottom:10px}.sectionSub{color:#999;line-height:1.65;max-width:620px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}.feature{border:1px solid var(--line);background:linear-gradient(180deg,#141414,#0d0d0d);border-radius:24px;padding:22px;min-height:190px;transition:.2s}.feature:hover{transform:translateY(-4px);border-color:#444}.feature i{width:42px;height:42px;border-radius:15px;background:#fff;color:#000;display:grid;place-items:center;font-style:normal;font-weight:900;margin-bottom:16px}.feature h3{font-size:18px;margin-bottom:8px}.feature p{color:#8e8e8e;line-height:1.6;font-size:14px}
-    @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes phoneIn{from{opacity:0;transform:translateY(26px) rotate(-2deg)}to{opacity:1;transform:none}}@keyframes slide{0%{transform:translateX(-100%)}45%,100%{transform:translateX(0)}}@keyframes cardPulse{0%,100%{border-color:#313131;transform:none}50%{border-color:#5a5a5a;transform:translateY(-2px)}}
-    @media(max-width:900px){.hero{grid-template-columns:1fr}.showcase{min-height:auto}.phone{margin:auto}.floatCard{display:none}.grid3{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.navlinks a:not(.cta){display:none}}@media(max-width:520px){.nav{padding:0 16px}.brand span{display:none}.hero{padding:0 16px 36px;margin-top:16px}.lead{font-size:15px}.stats{grid-template-columns:1fr}.phone{border-radius:34px;min-height:590px}.screen{border-radius:26px}.section{padding:24px 16px 46px}.actions .btn{width:100%}}
+    :root{--bg:#050505;--panel:#101010;--panel2:#171717;--line:#2e2e2e;--line2:#424242;--text:#f5f5f5;--muted:#a1a1a1;--dim:#707070;--white:#fff;--black:#000;--green:#4ade80;--shadow:0 30px 90px rgba(0,0,0,.58)}
+    html{scroll-behavior:smooth}
+    body{min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;overflow-x:hidden}
+    body:before{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradient(circle at 50% 8%,rgba(255,255,255,.11),transparent 26%),linear-gradient(180deg,#090909,#030303 58%,#080808)}
+    body:after{content:"";position:fixed;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:56px 56px;mask-image:linear-gradient(180deg,black,rgba(0,0,0,.72) 62%,transparent);opacity:.72}
+    .shell{width:min(1180px,calc(100% - 32px));margin:auto}
+    .topbar{height:78px;display:flex;align-items:center;justify-content:center}
+    .brand{display:flex;align-items:center;gap:12px}
+    .mark{width:48px;height:48px;border-radius:16px;background:#fff;color:#000;display:grid;place-items:center;font-size:24px;font-weight:950;box-shadow:0 18px 45px rgba(255,255,255,.08)}
+    .brand b{font-size:17px;letter-spacing:-.03em}
+    .brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+    .hero{position:relative;min-height:calc(100svh - 78px);padding:46px 0 64px;display:grid;align-items:center;overflow:hidden}
+    .heroVisual{position:absolute;inset:54px 0 auto;min-height:530px;pointer-events:none;opacity:.86}
+    .device{position:absolute;left:50%;top:36px;width:min(780px,92vw);min-height:420px;transform:translateX(-50%);border:1px solid rgba(255,255,255,.13);border-radius:42px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.025));box-shadow:var(--shadow);backdrop-filter:blur(18px);padding:22px}
+    .device:before{content:"";position:absolute;left:28px;right:28px;top:68px;height:1px;background:rgba(255,255,255,.08)}
+    .browserDots{display:flex;gap:8px;margin-bottom:24px}
+    .browserDots i{width:10px;height:10px;border-radius:50%;background:#5a5a5a}
+    .screenGrid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    .panel,.phone,.miniPanel{border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.34);border-radius:26px}
+    .panel{padding:18px;min-height:270px}
+    .panelHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .panelHead b{font-size:16px}
+    .pill{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.045);border-radius:999px;padding:7px 10px;color:#e6e6e6;font-size:12px}
+    .pill i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 6px rgba(74,222,128,.08)}
+    .rows{display:grid;gap:10px}
+    .row{display:grid;grid-template-columns:70px 1fr 92px;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);border-radius:18px;padding:12px}
+    .row strong{font-size:14px}
+    .row span{display:block;color:var(--dim);font-size:12px;margin-top:3px}
+    .badge{justify-self:end;border-radius:999px;background:rgba(255,255,255,.09);padding:7px 10px;font-size:11px;font-weight:850}
+    .phone{padding:14px;min-height:320px;background:linear-gradient(180deg,#171717,#090909)}
+    .phoneHero{border:1px solid rgba(255,255,255,.11);border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025));padding:14px;margin-bottom:12px}
+    .phoneHeroTop{display:flex;align-items:center;gap:10px}
+    .phoneLogo{width:44px;height:44px;border-radius:15px;background:#fff;color:#000;display:grid;place-items:center;font-size:21px}
+    .phoneHero h3{font-size:17px;line-height:1.1}
+    .phoneHero small{color:var(--muted)}
+    .progress{display:flex;gap:6px;margin-top:14px}
+    .progress i{height:4px;border-radius:999px;background:#3a3a3a;flex:1}
+    .progress i:first-child{background:#fff}
+    .service{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.10);border-radius:18px;background:rgba(255,255,255,.035);padding:11px;margin-top:9px}
+    .serviceIcon{width:38px;height:38px;border-radius:14px;background:#fff;color:#000;display:grid;place-items:center;font-weight:950}
+    .service b{font-size:13px}
+    .service span{color:var(--dim);font-size:11px}
+    .price{margin-left:auto;font-weight:950}
+    .miniPanel{position:absolute;padding:16px;min-width:230px;box-shadow:0 24px 70px rgba(0,0,0,.42);backdrop-filter:blur(16px)}
+    .miniPanel.left{left:0;bottom:42px}
+    .miniPanel.right{right:8px;bottom:88px}
+    .miniPanel strong{font-size:24px}
+    .miniPanel span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+    .copy{position:relative;z-index:2;text-align:center;margin:160px auto 0;width:min(820px,100%)}
+    .label{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.46);border-radius:999px;padding:9px 13px;color:#dfdfdf;font-size:12px;margin-bottom:18px;backdrop-filter:blur(14px)}
+    .label i{width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 7px rgba(255,255,255,.08)}
+    h1{font-size:clamp(58px,10vw,128px);line-height:.82;letter-spacing:-.075em;margin-bottom:20px}
+    .lead{color:#c5c5c5;font-size:clamp(17px,2vw,22px);line-height:1.6;max-width:760px;margin:0 auto}
+    .note{margin:28px auto 0;display:inline-flex;align-items:center;justify-content:center;gap:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);border-radius:20px;padding:14px 18px;color:#f2f2f2;font-weight:850;box-shadow:0 18px 60px rgba(0,0,0,.34)}
+    .section{padding:38px 0 76px}
+    .sectionTitle{text-align:center;max-width:760px;margin:0 auto 24px}
+    .sectionTitle h2{font-size:clamp(30px,4vw,52px);line-height:1;letter-spacing:-.055em;margin-bottom:12px}
+    .sectionTitle p{color:var(--muted);font-size:16px;line-height:1.65}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .feature{border:1px solid rgba(255,255,255,.12);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border-radius:24px;padding:22px;min-height:210px;box-shadow:0 22px 70px rgba(0,0,0,.22)}
+    .featureIcon{width:44px;height:44px;border-radius:15px;background:#fff;color:#000;display:grid;place-items:center;font-weight:950;margin-bottom:18px}
+    .feature h3{font-size:19px;margin-bottom:9px;letter-spacing:-.02em}
+    .feature p{color:var(--muted);line-height:1.6;font-size:14px}
+    .footer{border-top:1px solid rgba(255,255,255,.09);padding:22px 0 30px;color:var(--dim);font-size:12px;text-align:center}
+    @media(max-width:980px){.hero{min-height:auto;padding-top:18px}.heroVisual{position:relative;inset:auto;min-height:auto}.device{position:relative;left:auto;top:auto;transform:none;width:100%;min-height:auto}.copy{margin:34px auto 0}.screenGrid{grid-template-columns:1fr}.miniPanel{display:none}.features{grid-template-columns:1fr 1fr}}
+    @media(max-width:620px){.shell{width:min(100% - 24px,1180px)}.topbar{height:70px}.brand{justify-content:center}.hero{padding-bottom:36px}.device{border-radius:28px;padding:14px}.screenGrid{gap:12px}.panel{min-height:auto}.row{grid-template-columns:1fr;gap:7px}.badge{justify-self:start}.phone{min-height:auto}.copy{margin-top:28px}.note{width:100%;font-size:13px}.features{grid-template-columns:1fr}.section{padding-bottom:48px}h1{font-size:56px}}
   </style>
 </head>
 <body>
-  <div class="orb one"></div><div class="orb two"></div>
-  <nav class="nav">
-    <div class="brand"><div class="mark">✂</div><div><b>BarberOS</b><span>SaaS para barbearias</span></div></div>
-    <div class="navlinks"><a href="/painel">Painel</a><a class="cta" href="/agendar?demo=1">Ver agendamento</a></div>
-  </nav>
-  <main class="hero">
-    <section>
-      <div class="eyebrow"><span class="dot"></span> Agenda online + WhatsApp de cada barbearia</div>
-      <h1>Agendamento premium para barbearias modernas.</h1>
-      <p class="lead">Sistema SaaS com página mobile para o cliente, painel para o dono da barbearia e área administrativa para você controlar lojas, planos e integrações.</p>
-      <div class="actions"><a class="btn primary" href="/agendar?demo=1">Abrir agendamento mobile</a><a class="btn ghost" href="/painel">Entrar no painel da barbearia</a></div>
-      <div class="stats"><div class="stat"><strong>3 áreas</strong><span>SaaS, loja e cliente</span></div><div class="stat"><strong>Mobile</strong><span>Feito para WhatsApp/Instagram</span></div><div class="stat"><strong>API</strong><span>WhatsApp próprio por dono</span></div></div>
-    </section>
-    <section class="showcase" aria-label="Prévia mobile">
-      <div class="floatCard a"><strong>+1 agendamento</strong><span>Dono avisado no WhatsApp</span></div>
-      <div class="floatCard b"><strong>14:30</strong><span>Cliente confirmou presença</span></div>
-      <div class="phone"><div class="screen">
-        <div class="miniHero"><div class="miniTop"><div class="miniLogo">✂</div><div><h3>Barbearia Elite</h3><p>Escolha seu horário em poucos toques</p></div></div><div class="progress"><i></i><i></i><i></i><i></i></div></div>
-        <div class="cards"><div class="miniCard"><div class="miniIcon">✂</div><div><b>Corte degradê</b><small>45 min</small></div><div class="miniPrice">R$ 35</div></div><div class="miniCard"><div class="miniIcon">🧔</div><div><b>Corte + barba</b><small>60 min</small></div><div class="miniPrice">R$ 55</div></div><div class="miniCard"><div class="miniIcon">★</div><div><b>Combo premium</b><small>75 min</small></div><div class="miniPrice">R$ 75</div></div></div>
-        <div class="dock"><div><b>Escolha seu horário</b><span>Serviço, profissional e hora</span></div><button>Continuar</button></div>
-      </div></div>
+  <header class="topbar shell">
+    <div class="brand">
+      <div class="mark">&#9986;</div>
+      <div><b>BarberOS</b><span>Plataforma para barbearias</span></div>
+    </div>
+  </header>
+
+  <main class="hero shell">
+    <div class="heroVisual" aria-hidden="true">
+      <div class="device">
+        <div class="browserDots"><i></i><i></i><i></i></div>
+        <div class="screenGrid">
+          <div class="panel">
+            <div class="panelHead"><b>Agenda da barbearia</b><span class="pill"><i></i>ao vivo</span></div>
+            <div class="rows">
+              <div class="row"><strong>08:00</strong><div><strong>Cliente confirmado</strong><span>Corte + Barba</span></div><em class="badge">pago</em></div>
+              <div class="row"><strong>09:20</strong><div><strong>Novo agendamento</strong><span>Servico escolhido pelo cliente</span></div><em class="badge">novo</em></div>
+              <div class="row"><strong>14:40</strong><div><strong>Encaixe manual</strong><span>Adicionado pelo painel</span></div><em class="badge">agenda</em></div>
+            </div>
+          </div>
+          <div class="phone">
+            <div class="phoneHero">
+              <div class="phoneHeroTop"><div class="phoneLogo">&#9986;</div><div><h3>Barbearia Prime</h3><small>Agendamento em poucos toques</small></div></div>
+              <div class="progress"><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="service"><div class="serviceIcon">01</div><div><b>Corte masculino</b><span>Profissional e horario</span></div><div class="price">R$ 35</div></div>
+            <div class="service"><div class="serviceIcon">02</div><div><b>Barba completa</b><span>Confirmacao automatica</span></div><div class="price">R$ 40</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="miniPanel left"><strong>+18%</strong><span>crescimento mensal</span></div>
+      <div class="miniPanel right"><strong>R$ 4.8k</strong><span>resultado acompanhado</span></div>
+    </div>
+
+    <section class="copy">
+      <div class="label"><i></i> SaaS profissional para agenda, equipe e financeiro</div>
+      <h1>BarberOS</h1>
+      <p class="lead">Uma plataforma elegante para barbearias que precisam organizar agendamentos, profissionais, servicos, WhatsApp e financeiro em um painel simples de operar.</p>
+      <div class="note">Visual profissional para apresentar a plataforma com clareza</div>
     </section>
   </main>
-  <section class="section"><h2 class="sectionTitle">Separado do jeito certo.</h2><p class="sectionSub">Nada misturado: você tem seu admin SaaS, o dono tem o painel dele e o cliente recebe uma experiência simples pelo celular.</p><div class="grid3"><a class="feature" href="/admin-saas" style="color:inherit;text-decoration:none"><i>01</i><h3>Dono do SaaS</h3><p>Controle de barbearias, planos, status, receita e configurações gerais da plataforma.</p></a><a class="feature" href="/painel" style="color:inherit;text-decoration:none"><i>02</i><h3>Dono da barbearia</h3><p>Configura logo, nome, serviços, equipe, horários e o próprio WhatsApp.</p></a><a class="feature" href="/agendar?demo=1" style="color:inherit;text-decoration:none"><i>03</i><h3>Cliente final</h3><p>Agenda pelo celular com interface rápida, resumo fixo e confirmação automática.</p></a></div></section>
+
+  <section class="section shell">
+    <div class="sectionTitle">
+      <h2>Organizado para vender e operar melhor.</h2>
+      <p>O cliente agenda com clareza, o dono acompanha tudo em tempo real e a barbearia trabalha com uma rotina mais previsivel.</p>
+    </div>
+    <div class="features">
+      <article class="feature"><div class="featureIcon">A</div><h3>Agenda online</h3><p>Fluxo mobile com escolha de profissional, servico, horario, dados do cliente e confirmacao automatica quando houver vaga.</p></article>
+      <article class="feature"><div class="featureIcon">B</div><h3>Painel do dono</h3><p>Controle de agenda, servicos, barbeiros, horarios, encaixes manuais, cancelamentos e status em tempo real.</p></article>
+      <article class="feature"><div class="featureIcon">C</div><h3>WhatsApp proprio</h3><p>Conexao por barbearia para avisos, lembretes e mensagens operacionais mantendo cada loja separada.</p></article>
+      <article class="feature"><div class="featureIcon">D</div><h3>Financeiro</h3><p>Resumo mensal e anual, entradas, saidas, contas a pagar, lucro, prejuizo e relatorios para imprimir.</p></article>
+      <article class="feature"><div class="featureIcon">E</div><h3>Equipe e precos</h3><p>Cada barbeiro pode ter sua agenda, imagem, servicos vinculados e valores proprios por atendimento.</p></article>
+      <article class="feature"><div class="featureIcon">F</div><h3>Gestao central</h3><p>Visao geral das barbearias cadastradas, status das lojas, donos, acessos e configuracoes principais da plataforma.</p></article>
+    </div>
+  </section>
+
+  <footer class="footer shell">BarberOS - sistema de agendamento para barbearias.</footer>
 </body>
 </html>

@@ -12,16 +12,16 @@
     body{background:#050505;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;display:grid;place-items:center;padding:24px;overflow:hidden}
     body:before{content:"";position:fixed;inset:0;background:radial-gradient(circle at 20% 12%,rgba(255,255,255,.12),transparent 26%),radial-gradient(circle at 84% 18%,rgba(255,255,255,.08),transparent 28%),linear-gradient(rgba(255,255,255,.032) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.032) 1px,transparent 1px);background-size:auto,auto,54px 54px,54px 54px;z-index:-2}
     body:after{content:"";position:fixed;left:-160px;bottom:-180px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.08);filter:blur(42px);z-index:-1}
-    .card{width:min(100%,480px);border:1px solid rgba(255,255,255,.13);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.03));border-radius:30px;padding:30px;box-shadow:0 28px 90px rgba(0,0,0,.6);backdrop-filter:blur(18px)}
-    .logo{width:62px;height:62px;border-radius:20px;background:#fff;color:#000;display:grid;place-items:center;font-size:30px;font-weight:950;margin-bottom:22px}
-    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:8px 12px;color:#d8d8d8;font-size:12px;margin-bottom:16px;background:rgba(255,255,255,.045)}
+    .card{width:min(100%,480px);border:1px solid rgba(255,255,255,.13);background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.03));border-radius:30px;padding:30px;box-shadow:0 28px 90px rgba(0,0,0,.6);backdrop-filter:blur(18px);text-align:center}
+    .logo{width:62px;height:62px;border-radius:20px;background:#fff;color:#000;display:grid;place-items:center;font-size:30px;font-weight:950;margin:0 auto 22px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:8px 12px;color:#d8d8d8;font-size:12px;margin:0 auto 16px;background:rgba(255,255,255,.045)}
     .pill i{width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 7px rgba(255,255,255,.08)}
     h1{font-size:32px;line-height:1;letter-spacing:-.05em;margin-bottom:12px}
     p{color:var(--muted);font-size:15px;line-height:1.65}
-    .status{margin-top:20px;border:1px solid var(--line);border-radius:20px;background:rgba(0,0,0,.28);padding:14px;color:#d8d8d8;font-size:13px;line-height:1.5;min-height:52px}
+    .status{margin-top:20px;border:1px solid var(--line);border-radius:20px;background:rgba(0,0,0,.28);padding:14px;color:#d8d8d8;font-size:13px;line-height:1.5;min-height:52px;text-align:left}
     .status.ok{border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.09);color:#bbf7d0}
     .status.err{border-color:rgba(251,113,133,.36);background:rgba(251,113,133,.1);color:#fecdd3}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;justify-content:center}
     .btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;text-decoration:none;border-radius:16px;padding:13px 16px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;min-height:48px}
     .btn.primary{background:#fff;color:#000;border-color:#fff;flex:1}
     .spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.22);border-top-color:#fff;display:inline-block;animation:spin .75s linear infinite;margin-right:9px;vertical-align:-4px}
