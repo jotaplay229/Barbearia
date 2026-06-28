@@ -61,9 +61,9 @@ function cleanSlots(slots) {
 function customSlotsForDay(loja, dow, barbeiroId) {
   const custom = loja.horarios_custom || {};
   const barberDays = barbeiroId && custom.por_barbeiro ? custom.por_barbeiro[barbeiroId] : null;
+  const globalSlots = cleanSlots(custom.global?.[dow] || custom.global?.[String(dow)] || custom[dow] || custom[String(dow)] || []);
   const barberSlots = cleanSlots(barberDays?.[dow] || barberDays?.[String(dow)] || []);
-  if (barberSlots.length) return barberSlots;
-  return cleanSlots(custom.global?.[dow] || custom.global?.[String(dow)] || custom[dow] || custom[String(dow)] || []);
+  return [...new Set([...globalSlots, ...barberSlots])].sort();
 }
 
 async function getWhatsapp(barbeariaId) {
