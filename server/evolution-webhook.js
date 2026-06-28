@@ -59,6 +59,16 @@ function extractEvent(body) {
   return safeString(body?.event || body?.type || body?.data?.event || body?.data?.type || body?.data?.messageType);
 }
 
+function isFromMe(body) {
+  return Boolean(body?.data?.key?.fromMe || body?.key?.fromMe || body?.data?.fromMe || body?.fromMe);
+}
+
+function phoneCandidates(number) {
+  const normalized = normalizePhoneBR(number);
+  const local = normalized.startsWith('55') ? normalized.slice(2) : normalized;
+  return [...new Set([normalized, local].filter(Boolean))];
+}
+
 async function logWhatsapp(payload) {
   await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload(payload));
 }
@@ -75,6 +85,7 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('webhook_logs').insert({ evento: event || 'messages_upsert', payload: { instance, from, body } });
 
     if (!instance || !from || !text) return json(res, 200, { recebido: true, ignorado: true });
+    if (isFromMe(body)) return json(res, 200, { recebido: true, ignorado: 'outgoing_message' });
 
     const { data: whats, error: e1 } = await supabaseAdmin
       .from('barbearia_whatsapp')
@@ -90,7 +101,7 @@ export default async function handler(req, res) {
       .from('agendamentos')
       .select('*,clientes!inner(nome,telefone),servicos(*)')
       .eq('barbearia_id', whats.barbearia_id)
-      .eq('clientes.telefone', from)
+      .in('clientes.telefone', phoneCandidates(from))
       .in('status', ['aguardando_confirmacao_cliente', 'confirmado', 'pendente'])
       .gte('data_agendamento', new Date().toISOString().slice(0, 10))
       .order('data_agendamento', { ascending: true })

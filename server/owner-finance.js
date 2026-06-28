@@ -4,7 +4,6 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { normalizeAgendamento, normalizeBarbearia, serviceForBarber, storeMetaDescription } from '../lib/db-compat.js';
 
 const CANCELLED = new Set(['cancelado', 'recusado', 'cancelado_cliente']);
-const PAID = new Set(['pago']);
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -18,7 +17,9 @@ function cents(value) {
 
 function cleanFinance(finance = {}) {
   const lancamentos = Array.isArray(finance.lancamentos) ? finance.lancamentos : [];
+  const agendamentosPagos = Array.isArray(finance.agendamentos_pagos) ? finance.agendamentos_pagos : [];
   return {
+    ...finance,
     lancamentos: lancamentos.map(item => ({
       id: safeString(item.id) || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
       tipo: item.tipo === 'saida' ? 'saida' : 'entrada',
@@ -29,7 +30,14 @@ function cleanFinance(finance = {}) {
       status: item.status === 'pendente' ? 'pendente' : 'pago',
       forma: safeString(item.forma),
       observacao: safeString(item.observacao)
-    }))
+    })),
+    agendamentos_pagos: agendamentosPagos
+      .map(item => typeof item === 'string' ? { agendamento_id: item } : {
+        agendamento_id: safeString(item.agendamento_id || item.id),
+        pago_em: safeString(item.pago_em || item.paid_at),
+        forma: safeString(item.forma)
+      })
+      .filter(item => item.agendamento_id)
   };
 }
 
@@ -37,8 +45,8 @@ function activeAppointment(ag) {
   return !CANCELLED.has(String(ag.status || '').toLowerCase());
 }
 
-function paidAppointment(ag) {
-  return PAID.has(String(ag.status || '').toLowerCase());
+function paidAppointment(ag, paidSet) {
+  return paidSet.has(String(ag.id)) || String(ag.status || '').toLowerCase() === 'pago';
 }
 
 function monthOf(date) {
@@ -132,8 +140,9 @@ export default async function handler(req, res) {
         valor_cents: Number(servico.preco_cents || 0)
       };
     });
+    const paidSet = new Set(finance.agendamentos_pagos.map(item => String(item.agendamento_id)));
     const agsAtivos = agendamentos.filter(activeAppointment);
-    const agsPagos = agsAtivos.filter(paidAppointment);
+    const agsPagos = agsAtivos.filter(ag => paidAppointment(ag, paidSet));
     const agsMes = agsPagos.filter(ag => monthOf(ag.data_agendamento) === mes);
 
     const manuaisAno = finance.lancamentos.filter(item => String(item.data).startsWith(String(ano)));
