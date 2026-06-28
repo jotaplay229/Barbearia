@@ -1,7 +1,12 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { sendText } from '../lib/evolution.js';
-import { msgDonoClienteConfirmou, msgDonoClienteCancelou } from '../lib/messages.js';
+import {
+  msgClienteCancelamentoConfirmado,
+  msgClientePresencaConfirmada,
+  msgDonoClienteCancelou,
+  msgDonoClienteConfirmou
+} from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '../lib/db-compat.js';
 
 function extractText(body) {
@@ -13,15 +18,22 @@ function extractText(body) {
     body?.data?.text
   );
 }
+
 function extractRemoteNumber(body) {
   const jid = safeString(body?.data?.key?.remoteJid || body?.key?.remoteJid || body?.remoteJid || body?.from);
   return normalizePhoneBR(jid.split('@')[0]);
 }
+
 function extractInstance(body) {
   return safeString(body?.instance || body?.data?.instance || body?.instanceName || body?.data?.instanceName);
 }
+
 function extractEvent(body) {
   return safeString(body?.event || body?.type || body?.data?.event || body?.data?.type || body?.data?.messageType);
+}
+
+async function logWhatsapp(payload) {
+  await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload(payload));
 }
 
 export default async function handler(req, res) {
@@ -60,8 +72,8 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (e2) throw e2;
     if (!ag) return json(res, 200, { recebido: true, ignorado: 'appointment_not_found' });
-    const agView = normalizeAgendamento(ag);
 
+    const agView = normalizeAgendamento(ag);
     const isYes = ['1', 'sim', 's', 'vou', 'confirmo', 'confirmar'].includes(text);
     const isNo = ['2', 'nao', 'não', 'n', 'cancelar', 'cancela'].includes(text);
 
@@ -76,15 +88,77 @@ export default async function handler(req, res) {
       .single();
     if (e3) throw e3;
 
+    const baseMsg = {
+      barbearia: loja,
+      cliente_nome: agView.cliente_nome,
+      servico_nome: agView.servicos?.nome || 'Serviço',
+      data_agendamento: agView.data_agendamento,
+      hora_inicio: String(agView.hora_inicio).slice(0, 5)
+    };
+    const respostaCliente = isYes
+      ? msgClientePresencaConfirmada(baseMsg)
+      : msgClienteCancelamentoConfirmado(baseMsg);
+
+    try {
+      const retorno = await sendText({
+        apiUrl: whats.evolution_api_url,
+        apiKey: whats.evolution_api_key,
+        instanceName: whats.instance_name,
+        number: from,
+        text: respostaCliente
+      });
+      await logWhatsapp({
+        barbearia_id: ag.barbearia_id,
+        agendamento_id: ag.id,
+        destino: from,
+        tipo: isYes ? 'cliente_resposta_confirmada' : 'cliente_resposta_cancelada',
+        texto: respostaCliente,
+        status: 'enviado',
+        retorno
+      });
+    } catch (err) {
+      await logWhatsapp({
+        barbearia_id: ag.barbearia_id,
+        agendamento_id: ag.id,
+        destino: from,
+        tipo: isYes ? 'cliente_resposta_confirmada' : 'cliente_resposta_cancelada',
+        texto: respostaCliente,
+        status: 'erro',
+        erro: err.message
+      });
+    }
+
     if (loja.whatsapp_dono) {
       const msg = isYes
-        ? msgDonoClienteConfirmou({ cliente_nome: agView.cliente_nome, servico_nome: agView.servicos?.nome || 'Serviço', data_agendamento: agView.data_agendamento, hora_inicio: String(agView.hora_inicio).slice(0, 5) })
-        : msgDonoClienteCancelou({ cliente_nome: agView.cliente_nome, servico_nome: agView.servicos?.nome || 'Serviço', data_agendamento: agView.data_agendamento, hora_inicio: String(agView.hora_inicio).slice(0, 5) });
+        ? msgDonoClienteConfirmou(baseMsg)
+        : msgDonoClienteCancelou(baseMsg);
       try {
-        const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: loja.whatsapp_dono, text: msg });
-        await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: loja.whatsapp_dono, tipo: isYes ? 'dono_cliente_confirmou' : 'dono_cliente_cancelou', texto: msg, status: 'enviado', retorno }));
+        const retorno = await sendText({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name,
+          number: loja.whatsapp_dono,
+          text: msg
+        });
+        await logWhatsapp({
+          barbearia_id: ag.barbearia_id,
+          agendamento_id: ag.id,
+          destino: loja.whatsapp_dono,
+          tipo: isYes ? 'dono_cliente_confirmou' : 'dono_cliente_cancelou',
+          texto: msg,
+          status: 'enviado',
+          retorno
+        });
       } catch (err) {
-        await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: loja.whatsapp_dono, tipo: isYes ? 'dono_cliente_confirmou' : 'dono_cliente_cancelou', texto: msg, status: 'erro', erro: err.message }));
+        await logWhatsapp({
+          barbearia_id: ag.barbearia_id,
+          agendamento_id: ag.id,
+          destino: loja.whatsapp_dono,
+          tipo: isYes ? 'dono_cliente_confirmou' : 'dono_cliente_cancelou',
+          texto: msg,
+          status: 'erro',
+          erro: err.message
+        });
       }
     }
 

@@ -2,7 +2,7 @@ import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
 import { sendText } from '../lib/evolution.js';
-import { msgClienteConfirmado } from '../lib/messages.js';
+import { msgClienteCancelamentoConfirmado, msgClienteConfirmado } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, normalizeServico, serviceForBarber, whatsappLogPayload } from '../lib/db-compat.js';
 
 function toMinutes(t) {
@@ -188,6 +188,24 @@ export default async function handler(req, res) {
           await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo: 'cliente_confirmado', texto, status: 'enviado', retorno }));
         } catch (err) {
           await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo: 'cliente_confirmado', texto, status: 'erro', erro: err.message }));
+        }
+      }
+    }
+    if (['cancelado', 'cancelado_cliente'].includes(status)) {
+      const { data: whats } = await supabaseAdmin.from('barbearia_whatsapp').select('*').eq('barbearia_id', loja.id).eq('ativo', true).maybeSingle();
+      if (whats) {
+        const texto = msgClienteCancelamentoConfirmado({
+          barbearia: loja,
+          cliente_nome: agView.cliente_nome,
+          servico_nome: agView.servicos?.nome || 'Serviço',
+          data_agendamento: agView.data_agendamento,
+          hora_inicio: String(agView.hora_inicio).slice(0, 5)
+        });
+        try {
+          const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: agView.cliente_whatsapp, text: texto });
+          await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo: 'cliente_cancelado', texto, status: 'enviado', retorno }));
+        } catch (err) {
+          await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: loja.id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo: 'cliente_cancelado', texto, status: 'erro', erro: err.message }));
         }
       }
     }
