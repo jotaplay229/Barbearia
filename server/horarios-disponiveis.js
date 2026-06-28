@@ -2,6 +2,8 @@ import { json, method, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { normalizeBarbearia, normalizeServico, serviceForBarber } from '../lib/db-compat.js';
 
+const TIME_ZONE = 'America/Sao_Paulo';
+
 function toMinutes(t) {
   const [h, m] = String(t || '00:00').split(':').map(Number);
   return h * 60 + m;
@@ -17,6 +19,36 @@ function overlaps(startA, endA, startB, endB) {
 function dayOfWeek(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+function saoPauloNowParts() {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(new Date())
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+}
+function todaySaoPaulo() {
+  const parts = saoPauloNowParts();
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+function currentMinutesSaoPaulo() {
+  const parts = saoPauloNowParts();
+  return Number(parts.hour) * 60 + Number(parts.minute);
+}
+function minVisibleStartForDate(dateStr) {
+  const today = todaySaoPaulo();
+  if (dateStr < today) return Infinity;
+  if (dateStr === today) return currentMinutesSaoPaulo();
+  return -1;
 }
 function cleanSlots(slots) {
   return Array.isArray(slots)
@@ -90,16 +122,17 @@ export default async function handler(req, res) {
     const open = toMinutes(horario.abre);
     const close = toMinutes(horario.fecha);
     const horarios = [];
+    const minStart = minVisibleStartForDate(dataAg);
     const customSlots = customSlotsForDay(loja, dow, barbeiroId);
     if (customSlots.length) {
       for (const t of customSlots) {
         const m = toMinutes(t);
-        if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+        if (m > minStart && !busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
       }
     } else {
       for (let m = open; m + duracao <= close; m += intervalo) {
         const t = toTime(m);
-        if (!busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+        if (m > minStart && !busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
       }
     }
     return json(res, 200, { horarios });

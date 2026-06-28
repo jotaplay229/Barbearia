@@ -4,6 +4,8 @@ import { sendText } from '../lib/evolution.js';
 import { msgClienteConfirmado } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, normalizeServico, serviceForBarber, whatsappLogPayload } from '../lib/db-compat.js';
 
+const TIME_ZONE = 'America/Sao_Paulo';
+
 function toMinutes(t) {
   const [h, m] = String(t || '00:00').split(':').map(Number);
   return h * 60 + m;
@@ -22,6 +24,34 @@ function toTime(min) {
 function dayOfWeek(dateStr) {
   const [y, m, d] = String(dateStr || '').split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+function saoPauloNowParts() {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(new Date())
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+}
+function todaySaoPaulo() {
+  const parts = saoPauloNowParts();
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+function currentMinutesSaoPaulo() {
+  const parts = saoPauloNowParts();
+  return Number(parts.hour) * 60 + Number(parts.minute);
+}
+function isPastAppointment(dateStr, startMinutes) {
+  const today = todaySaoPaulo();
+  return dateStr < today || (dateStr === today && startMinutes <= currentMinutesSaoPaulo());
 }
 function cleanSlots(slots) {
   return Array.isArray(slots)
@@ -130,6 +160,9 @@ export default async function handler(req, res) {
 
     const start = toMinutes(hora_inicio);
     const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
+    if (isPastAppointment(data_agendamento, start)) {
+      return json(res, 400, { erro: 'Esse horario ja passou. Escolha outro horario disponivel.' });
+    }
     const dow = dayOfWeek(data_agendamento);
     const { data: horario, error: eHorario } = await supabaseAdmin
       .from('horarios_funcionamento')
