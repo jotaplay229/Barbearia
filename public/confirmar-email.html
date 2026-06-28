@@ -60,7 +60,14 @@
 
     function saveSession(session) {
       if (session?.access_token) {
-        try { localStorage.setItem('barberos_owner_token', session.access_token); } catch {}
+        try {
+          localStorage.setItem('barberos_owner_token', session.access_token);
+          localStorage.setItem('barberos_owner_session', JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token || '',
+            expires_at: Number(session.expires_at || 0)
+          }));
+        } catch {}
       }
     }
 
@@ -81,7 +88,11 @@
           if (error) throw error;
           saveSession(data?.session);
         } else if (hashParams.get('access_token')) {
-          saveSession({ access_token: hashParams.get('access_token') });
+          saveSession({
+            access_token: hashParams.get('access_token'),
+            refresh_token: hashParams.get('refresh_token') || '',
+            expires_at: Number(hashParams.get('expires_at') || 0)
+          });
         } else {
           throw new Error('Link de confirmacao incompleto ou expirado.');
         }

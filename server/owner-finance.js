@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { normalizeAgendamento, normalizeBarbearia, serviceForBarber, storeMetaDescription } from '../lib/db-compat.js';
 
 const CANCELLED = new Set(['cancelado', 'recusado', 'cancelado_cliente']);
+const PAID = new Set(['pago']);
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -34,6 +35,10 @@ function cleanFinance(finance = {}) {
 
 function activeAppointment(ag) {
   return !CANCELLED.has(String(ag.status || '').toLowerCase());
+}
+
+function paidAppointment(ag) {
+  return PAID.has(String(ag.status || '').toLowerCase());
 }
 
 function monthOf(date) {
@@ -128,7 +133,8 @@ export default async function handler(req, res) {
       };
     });
     const agsAtivos = agendamentos.filter(activeAppointment);
-    const agsMes = agsAtivos.filter(ag => monthOf(ag.data_agendamento) === mes);
+    const agsPagos = agsAtivos.filter(paidAppointment);
+    const agsMes = agsPagos.filter(ag => monthOf(ag.data_agendamento) === mes);
 
     const manuaisAno = finance.lancamentos.filter(item => String(item.data).startsWith(String(ano)));
     const manuaisMes = manuaisAno.filter(item => monthOf(item.data) === mes);
@@ -136,13 +142,13 @@ export default async function handler(req, res) {
     const pagosAno = manuaisAno.filter(item => item.status !== 'pendente');
     const entradasMes = sum(agsMes, item => item.valor_cents) + sum(pagosMes.filter(item => item.tipo === 'entrada'));
     const saidasMes = sum(pagosMes.filter(item => item.tipo === 'saida'));
-    const entradasAno = sum(agsAtivos, item => item.valor_cents) + sum(pagosAno.filter(item => item.tipo === 'entrada'));
+    const entradasAno = sum(agsPagos, item => item.valor_cents) + sum(pagosAno.filter(item => item.tipo === 'entrada'));
     const saidasAno = sum(pagosAno.filter(item => item.tipo === 'saida'));
     const pendentes = manuaisAno.filter(item => item.status === 'pendente');
 
     const meses = Array.from({ length: 12 }, (_, index) => {
       const m = index + 1;
-      const ags = agsAtivos.filter(ag => monthOf(ag.data_agendamento) === m);
+      const ags = agsPagos.filter(ag => monthOf(ag.data_agendamento) === m);
       const movs = manuaisAno.filter(item => monthOf(item.data) === m && item.status !== 'pendente');
       const entradas = sum(ags, item => item.valor_cents) + sum(movs.filter(item => item.tipo === 'entrada'));
       const saidas = sum(movs.filter(item => item.tipo === 'saida'));
@@ -160,17 +166,17 @@ export default async function handler(req, res) {
         saidas_ano_cents: saidasAno,
         lucro_ano_cents: entradasAno - saidasAno,
         agendamentos_mes: agsMes.length,
-        agendamentos_ano: agsAtivos.length,
+        agendamentos_ano: agsPagos.length,
         contas_pendentes_cents: sum(pendentes)
       },
       meses,
       agendamentos_mes: agsMes,
-      agendamentos_ano: agsAtivos,
+      agendamentos_ano: agsPagos,
       lancamentos_mes: manuaisMes,
       lancamentos_ano: manuaisAno,
       contas_pendentes: pendentes,
       top_servicos_mes: groupTop(agsMes, ag => ag.servicos?.nome || ag.servico_nome, ag => ag.valor_cents),
-      top_servicos_ano: groupTop(agsAtivos, ag => ag.servicos?.nome || ag.servico_nome, ag => ag.valor_cents),
+      top_servicos_ano: groupTop(agsPagos, ag => ag.servicos?.nome || ag.servico_nome, ag => ag.valor_cents),
       categorias_saida: groupTop(manuaisAno.filter(item => item.tipo === 'saida'), item => item.categoria, item => item.valor_cents),
       categorias_entrada: groupTop(manuaisAno.filter(item => item.tipo === 'entrada'), item => item.categoria, item => item.valor_cents)
     });

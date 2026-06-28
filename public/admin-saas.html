@@ -79,14 +79,20 @@ button,input,select{font:inherit}
 <div class="toast" id="toast">Salvo</div>
 
 <script>
-let token='', userEmail='', dash=null, current='dash', query='';
+let token='', refreshToken='', tokenExpiresAt=0, refreshInFlight=null, userEmail='', dash=null, current='dash', query='';
 const pageTitles={dash:'Dashboard',lojas:'Barbearias',monitor:'Monitor em tempo real',nova:'Criar loja',donos:'Donos de loja',config:'Configurações master',logs:'Logs do sistema'};
 
 function apiUrl(route,params={}){const u=new URL('/api/router',location.origin);u.searchParams.set('route',route);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,v)});return u.pathname+u.search}
-async function getJson(url,opt={}){const r=await fetch(url,opt);const txt=await r.text();let j={};try{j=txt?JSON.parse(txt):{}}catch(e){throw new Error('A API retornou erro da Vercel. Confirme o deploy.')}if(!r.ok)throw new Error(j.erro||j.error||('Erro HTTP '+r.status));return j}
+async function getJson(url,opt={}){const r=await fetch(url,opt);const txt=await r.text();let j={};try{j=txt?JSON.parse(txt):{}}catch(e){const err=new Error('A API retornou erro da Vercel. Confirme o deploy.');err.status=r.status;throw err}if(!r.ok){const err=new Error(j.erro||j.error||('Erro HTTP '+r.status));err.status=r.status;err.payload=j;throw err}return j}
 function readStore(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
 function saveStore(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}
-function request(route,opt={},params={}){const headers={'Content-Type':'application/json',...(opt.headers||{})};if(token)headers.Authorization='Bearer '+token;return getJson(apiUrl(route,params),{...opt,headers})}
+function readSession(){try{const raw=readStore('barberos_saas_session');if(raw){const s=JSON.parse(raw);if(s?.access_token)return s}const old=readStore('barberos_saas_token');return old?{access_token:old}:{};}catch(e){return {}}}
+function saveSession(s){try{if(s?.access_token){saveStore('barberos_saas_session',JSON.stringify({access_token:s.access_token,refresh_token:s.refresh_token||refreshToken||'',expires_at:Number(s.expires_at||tokenExpiresAt||0)}));saveStore('barberos_saas_token',s.access_token)}else{saveStore('barberos_saas_session','');saveStore('barberos_saas_token','')}}catch(e){}}
+function applySession(s){token=s?.access_token||'';refreshToken=s?.refresh_token||refreshToken||'';tokenExpiresAt=Number(s?.expires_at||0);if(token)saveSession({access_token:token,refresh_token:refreshToken,expires_at:tokenExpiresAt})}
+function clearSession(){token='';refreshToken='';tokenExpiresAt=0;saveSession(null)}
+function isAuthError(e){return e?.status===401||/sess|token|jwt|login/i.test(e?.message||'')}
+async function refreshSession(force=false){if(!refreshToken)return false;const now=Math.floor(Date.now()/1000);if(!force&&tokenExpiresAt&&now<tokenExpiresAt-120)return true;if(refreshInFlight)return refreshInFlight;refreshInFlight=(async()=>{try{const data=await getJson(apiUrl('auth-refresh'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})});applySession(data);return true}catch(e){clearSession();return false}finally{refreshInFlight=null}})();return refreshInFlight}
+async function request(route,opt={},params={},retried=false){if(!['auth-login','auth-refresh'].includes(route))await refreshSession(false);const headers={'Content-Type':'application/json',...(opt.headers||{})};if(token)headers.Authorization='Bearer '+token;try{return await getJson(apiUrl(route,params),{...opt,headers})}catch(e){if(!['auth-login','auth-refresh'].includes(route)&&!retried&&isAuthError(e)&&await refreshSession(true))return request(route,opt,params,true);if(!['auth-login','auth-refresh'].includes(route)&&isAuthError(e)){clearSession();loginView.style.display='grid';appView.classList.remove('show');showErr('Sessão expirada. Entre novamente.')}throw e}}
 function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function onlyDigits(v){return String(v||'').replace(/\D/g,'')}
 function localPhoneDigits(v){let d=onlyDigits(v);if(d.startsWith('55')&&d.length>11)d=d.slice(2);return d.slice(0,11)}
@@ -100,9 +106,9 @@ function showErr(msg){err.textContent=msg||'';err.classList.toggle('show',!!msg)
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;const show=el.type==='password';el.type=show?'text':'password';btn.textContent=show?'✕':'👁'}
 function toast(msg='Salvo com sucesso'){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 
-async function init(){token=readStore('barberos_saas_token');userEmail=readStore('barberos_saas_email');if(token){accountEmail.textContent=userEmail||'admin';try{await load()}catch(e){saveStore('barberos_saas_token','');showErr('Sessão expirada. Entre novamente.')}}}
-async function loginFn(){showErr('');try{loginBtn.textContent='Entrando...';const data=await request('auth-login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value,area:'saas'})});token=data.access_token;userEmail=data.user?.email||email.value.trim();saveStore('barberos_saas_token',token);saveStore('barberos_saas_email',userEmail);accountEmail.textContent=userEmail;await load()}catch(e){showErr(e.message)}finally{loginBtn.textContent='Entrar'}}
-function logout(){saveStore('barberos_saas_token','');saveStore('barberos_saas_email','');location.reload()}
+async function init(){applySession(readSession());userEmail=readStore('barberos_saas_email');if(token){accountEmail.textContent=userEmail||'admin';try{await load()}catch(e){clearSession();showErr('Sessão expirada. Entre novamente.')}}}
+async function loginFn(){showErr('');try{loginBtn.textContent='Entrando...';const data=await request('auth-login',{method:'POST',body:JSON.stringify({email:email.value.trim(),password:pass.value,area:'saas'})});applySession(data);userEmail=data.user?.email||email.value.trim();saveStore('barberos_saas_email',userEmail);accountEmail.textContent=userEmail;await load()}catch(e){showErr(e.message)}finally{loginBtn.textContent='Entrar'}}
+function logout(){clearSession();saveStore('barberos_saas_email','');location.reload()}
 async function load(){dash=await request('saas-dashboard');navTotal.textContent=dash.total_barbearias||0;openApp();render()}
 function openApp(){loginView.style.display='none';appView.classList.add('show')}
 function page(p){current=p;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));title.textContent=pageTitles[p]||p;render()}

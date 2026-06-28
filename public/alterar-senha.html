@@ -84,7 +84,14 @@
 
     function saveSession(session) {
       if (session?.access_token) {
-        try { localStorage.setItem('barberos_owner_token', session.access_token); } catch {}
+        try {
+          localStorage.setItem('barberos_owner_token', session.access_token);
+          localStorage.setItem('barberos_owner_session', JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token || '',
+            expires_at: Number(session.expires_at || 0)
+          }));
+        } catch {}
       }
     }
 

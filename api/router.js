@@ -1,5 +1,6 @@
 import agendamentos from '../server/agendamentos.js';
 import authLogin from '../server/auth-login.js';
+import authRefresh from '../server/auth-refresh.js';
 import confirmar from '../server/confirmar.js';
 import config from '../server/config.js';
 import cronLembretes from '../server/cron-lembretes.js';
@@ -20,6 +21,7 @@ import saasOwners from '../server/saas-owners.js';
 const routes = {
   'agendamentos': agendamentos,
   'auth-login': authLogin,
+  'auth-refresh': authRefresh,
   'confirmar': confirmar,
   'config': config,
   'cron-lembretes': cronLembretes,
