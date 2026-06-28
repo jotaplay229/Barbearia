@@ -7,6 +7,14 @@ import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '..
 const REMINDER_TYPE = 'lembrete_30m';
 const REMINDER_MINUTES_MIN = 25;
 const REMINDER_MINUTES_MAX = 35;
+const RETRYABLE_NOTIFICATION_TYPES = [
+  'cliente_confirmado',
+  'cliente_cancelado',
+  'cliente_resposta_confirmada',
+  'cliente_resposta_cancelada',
+  'dono_cliente_confirmou',
+  'dono_cliente_cancelou'
+];
 
 function saoPauloParts(d) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -135,6 +143,115 @@ async function reminderAlreadySent(agendamentoId, tipo) {
   return !!data;
 }
 
+async function alreadySentAfter(log) {
+  let query = supabaseAdmin
+    .from('whatsapp_logs')
+    .select('id')
+    .eq('tipo', log.tipo)
+    .eq('numero', log.numero)
+    .eq('status', 'enviado')
+    .gt('created_at', log.created_at)
+    .limit(1);
+  query = log.agendamento_id ? query.eq('agendamento_id', log.agendamento_id) : query.is('agendamento_id', null);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+async function retryFailedNotifications() {
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('whatsapp_logs')
+    .select('id,created_at,barbearia_id,agendamento_id,numero,tipo,mensagem')
+    .eq('status', 'erro')
+    .in('tipo', RETRYABLE_NOTIFICATION_TYPES)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) throw error;
+
+  let encontrados = 0;
+  let reenviados = 0;
+  let ignorados = 0;
+  let erros = 0;
+  const processed = new Set();
+
+  for (const log of data || []) {
+    const key = `${log.agendamento_id || ''}|${log.numero || ''}|${log.tipo || ''}`;
+    if (processed.has(key)) continue;
+    processed.add(key);
+    encontrados++;
+
+    if (!log.numero || !log.mensagem || await alreadySentAfter(log)) {
+      ignorados++;
+      continue;
+    }
+
+    if (log.agendamento_id) {
+      const { data: ag, error: agError } = await supabaseAdmin
+        .from('agendamentos')
+        .select('status')
+        .eq('id', log.agendamento_id)
+        .maybeSingle();
+      if (agError) throw agError;
+      const status = String(ag?.status || '');
+      if (log.tipo.includes('confirmado') && status === 'cancelado') {
+        ignorados++;
+        continue;
+      }
+      if (log.tipo.includes('cancelado') && status !== 'cancelado') {
+        ignorados++;
+        continue;
+      }
+    }
+
+    const { data: whats, error: whatsError } = await supabaseAdmin
+      .from('barbearia_whatsapp')
+      .select('*')
+      .eq('barbearia_id', log.barbearia_id)
+      .eq('ativo', true)
+      .maybeSingle();
+    if (whatsError) throw whatsError;
+    if (!whats) {
+      ignorados++;
+      continue;
+    }
+
+    try {
+      const retorno = await sendText({
+        apiUrl: whats.evolution_api_url,
+        apiKey: whats.evolution_api_key,
+        instanceName: whats.instance_name,
+        number: log.numero,
+        text: log.mensagem
+      });
+      await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({
+        barbearia_id: log.barbearia_id,
+        agendamento_id: log.agendamento_id,
+        destino: log.numero,
+        tipo: log.tipo,
+        texto: log.mensagem,
+        status: 'enviado',
+        retorno
+      }));
+      reenviados++;
+    } catch (err) {
+      await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({
+        barbearia_id: log.barbearia_id,
+        agendamento_id: log.agendamento_id,
+        destino: log.numero,
+        tipo: log.tipo,
+        texto: log.mensagem,
+        status: 'erro',
+        erro: err.message
+      }));
+      erros++;
+    }
+  }
+
+  return { encontrados, reenviados, ignorados, erros };
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['GET'])) return;
   try {
@@ -158,6 +275,7 @@ export default async function handler(req, res) {
     let semTelefone = 0;
     let foraDaJanela = 0;
     const webhooks = await syncActiveWebhooks();
+    const retentativas = await retryFailedNotifications();
 
     const { data: ags, error } = await supabaseAdmin
       .from('agendamentos')
@@ -208,7 +326,8 @@ export default async function handler(req, res) {
       sem_whatsapp: semWhatsapp,
       sem_telefone: semTelefone,
       fora_da_janela: foraDaJanela,
-      webhooks
+      webhooks,
+      retentativas
     });
   } catch (err) {
     return json(res, err.status || 500, { erro: err.message });
