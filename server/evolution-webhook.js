@@ -13,19 +13,46 @@ function extractText(body) {
   return safeString(
     body?.data?.message?.conversation ||
     body?.data?.message?.extendedTextMessage?.text ||
+    body?.data?.message?.ephemeralMessage?.message?.conversation ||
+    body?.data?.message?.ephemeralMessage?.message?.extendedTextMessage?.text ||
+    body?.data?.message?.buttonsResponseMessage?.selectedButtonId ||
+    body?.data?.message?.buttonsResponseMessage?.selectedDisplayText ||
+    body?.data?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    body?.data?.message?.templateButtonReplyMessage?.selectedId ||
     body?.message?.conversation ||
+    body?.message?.extendedTextMessage?.text ||
+    body?.message?.buttonsResponseMessage?.selectedButtonId ||
+    body?.message?.buttonsResponseMessage?.selectedDisplayText ||
+    body?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    body?.message?.templateButtonReplyMessage?.selectedId ||
     body?.text ||
     body?.data?.text
   );
 }
 
+function jidToPhone(value) {
+  const base = safeString(value).split('@')[0].split(':')[0];
+  return normalizePhoneBR(base);
+}
+
 function extractRemoteNumber(body) {
-  const jid = safeString(body?.data?.key?.remoteJid || body?.key?.remoteJid || body?.remoteJid || body?.from);
-  return normalizePhoneBR(jid.split('@')[0]);
+  return jidToPhone(
+    body?.data?.key?.remoteJid ||
+    body?.key?.remoteJid ||
+    body?.data?.remoteJid ||
+    body?.remoteJid ||
+    body?.data?.from ||
+    body?.from ||
+    body?.sender
+  );
 }
 
 function extractInstance(body) {
-  return safeString(body?.instance || body?.data?.instance || body?.instanceName || body?.data?.instanceName);
+  const raw = body?.instance || body?.data?.instance || body?.instanceName || body?.data?.instanceName;
+  if (raw && typeof raw === 'object') {
+    return safeString(raw.instanceName || raw.name || raw.instance || raw.id);
+  }
+  return safeString(raw);
 }
 
 function extractEvent(body) {
