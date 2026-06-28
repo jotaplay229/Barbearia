@@ -1,4 +1,4 @@
-import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
+import { isValidMobilePhoneBR, json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { sendText } from '../lib/evolution.js';
 import { msgClienteConfirmado } from '../lib/messages.js';
@@ -105,6 +105,9 @@ export default async function handler(req, res) {
 
     if (!slug || !cliente_nome || !cliente_whatsapp || !servico_id || !data_agendamento || !hora_inicio) {
       return json(res, 400, { erro: 'Dados obrigatórios faltando.' });
+    }
+    if (!isValidMobilePhoneBR(cliente_whatsapp)) {
+      return json(res, 400, { erro: 'Digite um WhatsApp valido com DDD e 9 digitos.' });
     }
     if (!/^\d{2}:\d{2}$/.test(hora_inicio)) {
       return json(res, 400, { erro: 'Informe um horario valido.' });

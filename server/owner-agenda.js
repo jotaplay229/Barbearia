@@ -1,4 +1,4 @@
-import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
+import { isValidMobilePhoneBR, json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
 import { sendText } from '../lib/evolution.js';
@@ -192,6 +192,9 @@ export default async function handler(req, res) {
 
       if (!cliente_nome || !cliente_whatsapp || !servico_id || !data_agendamento || !hora_inicio) {
         return json(res, 400, { erro: 'Preencha cliente, WhatsApp, servico, data e horario.' });
+      }
+      if (!isValidMobilePhoneBR(cliente_whatsapp)) {
+        return json(res, 400, { erro: 'Digite um WhatsApp valido com DDD e 9 digitos.' });
       }
 
       const { data: servico, error: servicoError } = await supabaseAdmin
