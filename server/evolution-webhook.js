@@ -74,6 +74,12 @@ function jidToPhone(value) {
 function extractRemoteNumber(body) {
   const data = eventData(body);
   return jidToPhone(
+    data?.key?.senderPn ||
+    body?.key?.senderPn ||
+    data?.senderPn ||
+    body?.senderPn ||
+    data?.participantPn ||
+    body?.participantPn ||
     data?.key?.remoteJid ||
     body?.key?.remoteJid ||
     data?.remoteJid ||
@@ -84,7 +90,7 @@ function extractRemoteNumber(body) {
     body?.from ||
     data?.key?.participant ||
     body?.key?.participant ||
-    findDeepValue(body, new Set(['remotejid', 'sender', 'participant']))
+    findDeepValue(body, new Set(['senderpn', 'participantpn', 'remotejid', 'sender', 'participant']))
   );
 }
 
