@@ -100,9 +100,14 @@ async function activeWhatsapp(lojaId) {
   return data;
 }
 
+function isInvalidWhatsappNumberError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('exists') && msg.includes('false');
+}
+
 async function notifyClient({ loja, ag, tipo }) {
   const whats = await activeWhatsapp(loja.id);
-  if (!whats) return;
+  if (!whats) return { ok: false, erro: 'WhatsApp da barbearia nao configurado.' };
 
   const agView = normalizeAgendamento(ag);
   const base = {
@@ -134,6 +139,7 @@ async function notifyClient({ loja, ag, tipo }) {
       status: 'enviado',
       retorno
     }));
+    return { ok: true };
   } catch (err) {
     await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({
       barbearia_id: loja.id,
@@ -144,6 +150,7 @@ async function notifyClient({ loja, ag, tipo }) {
       status: 'erro',
       erro: err.message
     }));
+    return { ok: false, invalidNumber: isInvalidWhatsappNumberError(err), erro: err.message };
   }
 }
 
@@ -272,7 +279,11 @@ export default async function handler(req, res) {
       }, paidIds(loja));
 
       if ((status || 'confirmado') === 'confirmado') {
-        await notifyClient({ loja, ag: { ...agendamento, clientes: { nome: cliente_nome, telefone: cliente_whatsapp }, servicos: servicoNorm }, tipo: 'confirmado' });
+        const notify = await notifyClient({ loja, ag: { ...agendamento, clientes: { nome: cliente_nome, telefone: cliente_whatsapp }, servicos: servicoNorm }, tipo: 'confirmado' });
+        if (notify?.invalidNumber) {
+          await supabaseAdmin.from('agendamentos').update({ status: 'cancelado' }).eq('id', agendamento.id);
+          return json(res, 400, { erro: 'Esse WhatsApp nao existe ou nao esta ativo. Confira o numero e tente novamente.' });
+        }
       }
 
       return json(res, 201, {

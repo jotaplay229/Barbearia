@@ -133,14 +133,16 @@ async function sendReminder(ag, whats, tipo) {
 async function reminderAlreadySent(agendamentoId, tipo) {
   const { data, error } = await supabaseAdmin
     .from('whatsapp_logs')
-    .select('id')
+    .select('id,status,erro')
     .eq('agendamento_id', agendamentoId)
     .eq('tipo', tipo)
-    .eq('status', 'enviado')
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: false })
+    .limit(8);
   if (error) throw error;
-  return !!data;
+  return (data || []).some(log => {
+    const err = String(log.erro || '').toLowerCase();
+    return log.status === 'enviado' || (err.includes('exists') && err.includes('false'));
+  });
 }
 
 async function alreadySentAfter(log) {

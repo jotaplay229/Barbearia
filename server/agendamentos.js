@@ -90,6 +90,11 @@ async function logWhatsapp({ barbearia_id, agendamento_id, destino, tipo, texto,
   }));
 }
 
+function isInvalidWhatsappNumberError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('exists') && msg.includes('false');
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['POST'])) return;
   try {
@@ -264,6 +269,13 @@ export default async function handler(req, res) {
         avisos.push('cliente');
       } catch (err) {
         await logWhatsapp({ barbearia_id: loja.id, agendamento_id: agendamento.id, destino: cliente_whatsapp, tipo: 'cliente_confirmado', texto: textoCliente, status: 'erro', erro: err.message });
+        if (isInvalidWhatsappNumberError(err)) {
+          await supabaseAdmin
+            .from('agendamentos')
+            .update({ status: 'cancelado' })
+            .eq('id', agendamento.id);
+          return json(res, 400, { erro: 'Esse WhatsApp nao existe ou nao esta ativo. Confira o numero e tente novamente.' });
+        }
       }
     }
 
