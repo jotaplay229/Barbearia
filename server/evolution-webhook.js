@@ -162,6 +162,11 @@ function phoneCandidates(number) {
   return [...new Set(candidates.filter(Boolean))];
 }
 
+function phonesOverlap(a, b) {
+  const aSet = new Set(phoneCandidates(a));
+  return phoneCandidates(b).some(phone => aSet.has(phone));
+}
+
 async function logWhatsapp(payload) {
   await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload(payload));
 }
@@ -223,13 +228,20 @@ export default async function handler(req, res) {
     const event = extractEvent(body);
     const text = extractText(body).trim().toLowerCase();
     const from = extractRemoteNumber(body);
+    const fromMe = isFromMe(body);
 
     await supabaseAdmin.from('webhook_logs').insert({ evento: event || 'messages_upsert', payload: { instance, from, body } });
 
     if (!from || !text) return json(res, 200, { recebido: true, ignorado: true });
-    if (isFromMe(body)) return json(res, 200, { recebido: true, ignorado: 'outgoing_message' });
 
     let whats = await findWhatsappByInstance(instance);
+    if (fromMe) {
+      if (!whats) return json(res, 200, { recebido: true, ignorado: 'outgoing_message' });
+      const lojaFromInstance = normalizeBarbearia(whats.barbearias || {});
+      if (!phonesOverlap(from, lojaFromInstance.whatsapp_dono)) {
+        return json(res, 200, { recebido: true, ignorado: 'outgoing_message' });
+      }
+    }
     let ag = null;
 
     if (whats) ag = await findAppointmentForReply({ from, barbeariaId: whats.barbearia_id });
