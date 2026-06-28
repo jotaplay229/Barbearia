@@ -61,14 +61,41 @@ function authorized(req) {
 
 async function ensureWebhook(whats) {
   const base = publicBaseUrl();
-  if (!base) return null;
+  if (!base) return { ok: false, erro: 'APP_URL nao configurada.' };
   try {
-    return await setWebhook({
+    const retorno = await setWebhook({
       apiUrl: whats.evolution_api_url,
       apiKey: whats.evolution_api_key,
       instanceName: whats.instance_name,
       webhookUrl: `${base.replace(/\/$/, '')}/api/evolution-webhook`
     });
+    return { ok: true, retorno };
+  } catch (err) {
+    return { ok: false, erro: err.message };
+  }
+}
+
+async function syncActiveWebhooks() {
+  const { data, error } = await supabaseAdmin
+    .from('barbearia_whatsapp')
+    .select('*')
+    .eq('ativo', true);
+  if (error) throw error;
+
+  let sincronizados = 0;
+  let erros = 0;
+  for (const whats of data || []) {
+    if (!whats.evolution_api_url || !whats.evolution_api_key || !whats.instance_name) continue;
+    const result = await ensureWebhook(whats);
+    if (result.ok) sincronizados++;
+    else erros++;
+  }
+  return { sincronizados, erros };
+}
+
+async function ensureReminderWebhook(whats) {
+  try {
+    return await ensureWebhook(whats);
   } catch {
     return null;
   }
@@ -85,7 +112,7 @@ async function sendReminder(ag, whats, tipo) {
     hora_inicio: String(agView.hora_inicio).slice(0, 5)
   });
   try {
-    await ensureWebhook(whats);
+    await ensureReminderWebhook(whats);
     const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: agView.cliente_whatsapp, text: texto });
     await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo, texto, status: 'enviado', retorno }));
     return true;
@@ -130,6 +157,7 @@ export default async function handler(req, res) {
     let semWhatsapp = 0;
     let semTelefone = 0;
     let foraDaJanela = 0;
+    const webhooks = await syncActiveWebhooks();
 
     const { data: ags, error } = await supabaseAdmin
       .from('agendamentos')
@@ -179,7 +207,8 @@ export default async function handler(req, res) {
       ja_enviados: jaEnviados,
       sem_whatsapp: semWhatsapp,
       sem_telefone: semTelefone,
-      fora_da_janela: foraDaJanela
+      fora_da_janela: foraDaJanela,
+      webhooks
     });
   } catch (err) {
     return json(res, err.status || 500, { erro: err.message });

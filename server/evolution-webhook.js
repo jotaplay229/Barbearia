@@ -11,16 +11,34 @@ import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '..
 
 const TIME_ZONE = 'America/Sao_Paulo';
 
+function eventData(body) {
+  return Array.isArray(body?.data) ? body.data[0] || {} : body?.data || {};
+}
+
+function findDeepValue(obj, keys) {
+  if (!obj || typeof obj !== 'object') return '';
+  for (const [key, value] of Object.entries(obj)) {
+    const normalizedKey = key.toLowerCase().replace(/[_-]/g, '');
+    if (keys.has(normalizedKey) && typeof value === 'string' && value.trim()) return value.trim();
+    if (value && typeof value === 'object') {
+      const found = findDeepValue(value, keys);
+      if (found) return found;
+    }
+  }
+  return '';
+}
+
 function extractText(body) {
+  const data = eventData(body);
   return safeString(
-    body?.data?.message?.conversation ||
-    body?.data?.message?.extendedTextMessage?.text ||
-    body?.data?.message?.ephemeralMessage?.message?.conversation ||
-    body?.data?.message?.ephemeralMessage?.message?.extendedTextMessage?.text ||
-    body?.data?.message?.buttonsResponseMessage?.selectedButtonId ||
-    body?.data?.message?.buttonsResponseMessage?.selectedDisplayText ||
-    body?.data?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-    body?.data?.message?.templateButtonReplyMessage?.selectedId ||
+    data?.message?.conversation ||
+    data?.message?.extendedTextMessage?.text ||
+    data?.message?.ephemeralMessage?.message?.conversation ||
+    data?.message?.ephemeralMessage?.message?.extendedTextMessage?.text ||
+    data?.message?.buttonsResponseMessage?.selectedButtonId ||
+    data?.message?.buttonsResponseMessage?.selectedDisplayText ||
+    data?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    data?.message?.templateButtonReplyMessage?.selectedId ||
     body?.message?.conversation ||
     body?.message?.extendedTextMessage?.text ||
     body?.message?.buttonsResponseMessage?.selectedButtonId ||
@@ -28,7 +46,8 @@ function extractText(body) {
     body?.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
     body?.message?.templateButtonReplyMessage?.selectedId ||
     body?.text ||
-    body?.data?.text
+    data?.text ||
+    findDeepValue(body, new Set(['conversation', 'text', 'selectedbuttonid', 'selecteddisplaytext', 'selectedrowid', 'selectedid']))
   );
 }
 
@@ -38,22 +57,25 @@ function jidToPhone(value) {
 }
 
 function extractRemoteNumber(body) {
+  const data = eventData(body);
   return jidToPhone(
-    body?.data?.key?.remoteJid ||
+    data?.key?.remoteJid ||
     body?.key?.remoteJid ||
-    body?.data?.remoteJid ||
+    data?.remoteJid ||
     body?.remoteJid ||
-    body?.data?.from ||
-    body?.data?.sender ||
+    data?.from ||
+    data?.sender ||
     body?.sender ||
     body?.from ||
-    body?.data?.key?.participant ||
-    body?.key?.participant
+    data?.key?.participant ||
+    body?.key?.participant ||
+    findDeepValue(body, new Set(['remotejid', 'sender', 'participant']))
   );
 }
 
 function extractInstance(body) {
-  const raw = body?.instance || body?.data?.instance || body?.instanceName || body?.data?.instanceName;
+  const data = eventData(body);
+  const raw = body?.instance || data?.instance || body?.instanceName || data?.instanceName || findDeepValue(body, new Set(['instancename']));
   if (raw && typeof raw === 'object') {
     return safeString(raw.instanceName || raw.name || raw.instance || raw.id);
   }
@@ -61,11 +83,13 @@ function extractInstance(body) {
 }
 
 function extractEvent(body) {
-  return safeString(body?.event || body?.type || body?.data?.event || body?.data?.type || body?.data?.messageType);
+  const data = eventData(body);
+  return safeString(body?.event || body?.type || data?.event || data?.type || data?.messageType);
 }
 
 function isFromMe(body) {
-  return Boolean(body?.data?.key?.fromMe || body?.key?.fromMe || body?.data?.fromMe || body?.fromMe);
+  const data = eventData(body);
+  return Boolean(data?.key?.fromMe || body?.key?.fromMe || data?.fromMe || body?.fromMe);
 }
 
 function toMinutes(time) {

@@ -1,7 +1,7 @@
 import { json, method, normalizePhoneBR, safeString } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireOwnerBarbearia } from '../lib/auth.js';
-import { connectionState, connectInstance, createInstance, logoutInstance, maskSecret, normalizeQrPayload, sendText, setInstanceSettings, setWebhook } from '../lib/evolution.js';
+import { connectionState, connectInstance, createInstance, findWebhook, logoutInstance, maskSecret, normalizeQrPayload, sendText, setInstanceSettings, setWebhook } from '../lib/evolution.js';
 import { normalizeBarbearia } from '../lib/db-compat.js';
 
 function appUrlFromReq(req) {
@@ -180,6 +180,16 @@ export default async function handler(req, res) {
       } catch (err) {
         webhook = { erro: err.message };
       }
+      let webhookAtual = null;
+      try {
+        webhookAtual = await findWebhook({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name
+        });
+      } catch (err) {
+        webhookAtual = { erro: err.message };
+      }
       const state = await connectionState({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -194,7 +204,7 @@ export default async function handler(req, res) {
           .eq('barbearia_id', loja.id);
       }
 
-      return json(res, 200, { sucesso: true, state, settings, webhook, webhookUrl, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, state, settings, webhook, webhookAtual, webhookUrl, whatsapp: publicWhatsapp(whats) });
     }
 
     if (action === 'create-instance' || action === 'qrcode' || action === 'save-and-qrcode') {
