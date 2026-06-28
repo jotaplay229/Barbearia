@@ -162,7 +162,7 @@ async function retryFailedNotifications() {
   const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabaseAdmin
     .from('whatsapp_logs')
-    .select('id,created_at,barbearia_id,agendamento_id,numero,tipo,mensagem')
+    .select('id,created_at,barbearia_id,agendamento_id,numero,tipo,mensagem,erro')
     .eq('status', 'erro')
     .in('tipo', RETRYABLE_NOTIFICATION_TYPES)
     .gte('created_at', since)
@@ -182,7 +182,10 @@ async function retryFailedNotifications() {
     processed.add(key);
     encontrados++;
 
-    if (!log.numero || !log.mensagem || await alreadySentAfter(log)) {
+    const logError = String(log.erro || '').toLowerCase();
+    const permanentNumberError = logError.includes('exists') && logError.includes('false');
+
+    if (!log.numero || !log.mensagem || permanentNumberError || await alreadySentAfter(log)) {
       ignorados++;
       continue;
     }
