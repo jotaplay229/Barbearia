@@ -132,6 +132,48 @@ async function allowCalls(whats) {
   }
 }
 
+function findDeepText(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  for (const [key, value] of Object.entries(obj)) {
+    const normalized = key.toLowerCase().replace(/[_-]/g, '');
+    if (['conversation', 'text', 'selectedbuttonid', 'selecteddisplaytext', 'selectedrowid', 'selectedid'].includes(normalized) && typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    if (value && typeof value === 'object') {
+      const found = findDeepText(value);
+      if (found) return found;
+    }
+  }
+  return '';
+}
+
+async function recentWebhookEvents(instanceName) {
+  const { data, error } = await supabaseAdmin
+    .from('webhook_logs')
+    .select('evento,payload,created_at')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) {
+    return { erro: error.message, eventos: [] };
+  }
+
+  const eventos = (data || [])
+    .filter(log => !instanceName || JSON.stringify(log.payload || {}).includes(instanceName))
+    .slice(0, 8)
+    .map(log => {
+      const payload = log.payload || {};
+      return {
+        hora: log.created_at,
+        evento: log.evento || payload.body?.event || '',
+        instancia: payload.instance || '',
+        numero: payload.from || '',
+        texto: findDeepText(payload.body || {}),
+        origem: payload.body?.data?.key?.fromMe || payload.body?.key?.fromMe ? 'enviada_pela_barbearia' : 'cliente'
+      };
+    });
+  return { eventos };
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['GET', 'PUT', 'POST'])) return;
   try {
@@ -190,6 +232,7 @@ export default async function handler(req, res) {
       } catch (err) {
         webhookAtual = { erro: err.message };
       }
+      const ultimosEventos = await recentWebhookEvents(whats.instance_name);
       const state = await connectionState({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -204,7 +247,7 @@ export default async function handler(req, res) {
           .eq('barbearia_id', loja.id);
       }
 
-      return json(res, 200, { sucesso: true, state, settings, webhook, webhookAtual, webhookUrl, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, state, settings, webhook, webhookAtual, ultimosEventos, webhookUrl, whatsapp: publicWhatsapp(whats) });
     }
 
     if (action === 'create-instance' || action === 'qrcode' || action === 'save-and-qrcode') {

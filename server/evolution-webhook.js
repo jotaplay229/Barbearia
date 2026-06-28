@@ -15,6 +15,21 @@ function eventData(body) {
   return Array.isArray(body?.data) ? body.data[0] || {} : body?.data || {};
 }
 
+function normalizeWebhookBody(raw) {
+  if (Buffer.isBuffer(raw)) raw = raw.toString('utf8');
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { text };
+    }
+  }
+  if (Array.isArray(raw)) return { data: raw };
+  return raw && typeof raw === 'object' ? raw : {};
+}
+
 function findDeepValue(obj, keys) {
   if (!obj || typeof obj !== 'object') return '';
   for (const [key, value] of Object.entries(obj)) {
@@ -151,10 +166,59 @@ async function logWhatsapp(payload) {
   await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload(payload));
 }
 
+async function findWhatsappByInstance(instance) {
+  if (!instance) return null;
+  const base = supabaseAdmin
+    .from('barbearia_whatsapp')
+    .select('*,barbearias(*)')
+    .eq('ativo', true);
+
+  const exact = await base.eq('instance_name', instance).maybeSingle();
+  if (exact.error) throw exact.error;
+  if (exact.data) return exact.data;
+
+  const loose = await supabaseAdmin
+    .from('barbearia_whatsapp')
+    .select('*,barbearias(*)')
+    .eq('ativo', true)
+    .ilike('instance_name', instance)
+    .maybeSingle();
+  if (loose.error) throw loose.error;
+  return loose.data || null;
+}
+
+async function findWhatsappByBarbearia(barbeariaId) {
+  const { data, error } = await supabaseAdmin
+    .from('barbearia_whatsapp')
+    .select('*,barbearias(*)')
+    .eq('barbearia_id', barbeariaId)
+    .eq('ativo', true)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function findAppointmentForReply({ from, barbeariaId = null }) {
+  let query = supabaseAdmin
+    .from('agendamentos')
+    .select('*,clientes!inner(nome,telefone),servicos(*),barbearias(*)')
+    .in('clientes.telefone', phoneCandidates(from))
+    .in('status', ['aguardando_confirmacao_cliente', 'confirmado', 'pendente'])
+    .gte('data_agendamento', todaySaoPaulo())
+    .order('data_agendamento', { ascending: true })
+    .order('hora_inicio', { ascending: true })
+    .limit(20);
+  if (barbeariaId) query = query.eq('barbearia_id', barbeariaId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).find(isUpcomingAppointment) || null;
+}
+
 export default async function handler(req, res) {
   if (!method(req, res, ['POST'])) return;
   try {
-    const body = req.body || {};
+    const body = normalizeWebhookBody(req.body);
     const instance = extractInstance(body);
     const event = extractEvent(body);
     const text = extractText(body).trim().toLowerCase();
@@ -162,32 +226,18 @@ export default async function handler(req, res) {
 
     await supabaseAdmin.from('webhook_logs').insert({ evento: event || 'messages_upsert', payload: { instance, from, body } });
 
-    if (!instance || !from || !text) return json(res, 200, { recebido: true, ignorado: true });
+    if (!from || !text) return json(res, 200, { recebido: true, ignorado: true });
     if (isFromMe(body)) return json(res, 200, { recebido: true, ignorado: 'outgoing_message' });
 
-    const { data: whats, error: e1 } = await supabaseAdmin
-      .from('barbearia_whatsapp')
-      .select('*,barbearias(*)')
-      .eq('instance_name', instance)
-      .eq('ativo', true)
-      .maybeSingle();
-    if (e1) throw e1;
-    if (!whats) return json(res, 200, { recebido: true, ignorado: 'instance_not_found' });
-    const loja = normalizeBarbearia(whats.barbearias || {});
+    let whats = await findWhatsappByInstance(instance);
+    let ag = null;
 
-    const { data: ags, error: e2 } = await supabaseAdmin
-      .from('agendamentos')
-      .select('*,clientes!inner(nome,telefone),servicos(*)')
-      .eq('barbearia_id', whats.barbearia_id)
-      .in('clientes.telefone', phoneCandidates(from))
-      .in('status', ['aguardando_confirmacao_cliente', 'confirmado', 'pendente'])
-      .gte('data_agendamento', todaySaoPaulo())
-      .order('data_agendamento', { ascending: true })
-      .order('hora_inicio', { ascending: true })
-      .limit(10);
-    if (e2) throw e2;
-    const ag = (ags || []).find(isUpcomingAppointment);
+    if (whats) ag = await findAppointmentForReply({ from, barbeariaId: whats.barbearia_id });
+    if (!ag) ag = await findAppointmentForReply({ from });
     if (!ag) return json(res, 200, { recebido: true, ignorado: 'appointment_not_found' });
+    if (!whats) whats = await findWhatsappByBarbearia(ag.barbearia_id);
+    if (!whats) return json(res, 200, { recebido: true, ignorado: 'whatsapp_not_found' });
+    const loja = normalizeBarbearia(whats.barbearias || ag.barbearias || {});
 
     const agView = normalizeAgendamento(ag);
     const isYes = ['1', 'sim', 's', 'vou', 'confirmo', 'confirmar'].includes(text);
