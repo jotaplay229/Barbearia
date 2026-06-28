@@ -1,6 +1,6 @@
-import { json, method } from '../lib/http.js';
+import { json, method, publicBaseUrl } from '../lib/http.js';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { sendText } from '../lib/evolution.js';
+import { sendText, setWebhook } from '../lib/evolution.js';
 import { msgClienteLembrete } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '../lib/db-compat.js';
 
@@ -59,6 +59,21 @@ function authorized(req) {
   return req.query.secret === expected || authSecret(req) === expected;
 }
 
+async function ensureWebhook(whats) {
+  const base = publicBaseUrl();
+  if (!base) return null;
+  try {
+    return await setWebhook({
+      apiUrl: whats.evolution_api_url,
+      apiKey: whats.evolution_api_key,
+      instanceName: whats.instance_name,
+      webhookUrl: `${base.replace(/\/$/, '')}/api/evolution-webhook`
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function sendReminder(ag, whats, tipo) {
   const agView = normalizeAgendamento(ag);
   const loja = normalizeBarbearia(ag.barbearias || {});
@@ -70,11 +85,9 @@ async function sendReminder(ag, whats, tipo) {
     hora_inicio: String(agView.hora_inicio).slice(0, 5)
   });
   try {
+    await ensureWebhook(whats);
     const retorno = await sendText({ apiUrl: whats.evolution_api_url, apiKey: whats.evolution_api_key, instanceName: whats.instance_name, number: agView.cliente_whatsapp, text: texto });
     await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo, texto, status: 'enviado', retorno }));
-    if (tipo === REMINDER_TYPE && ['confirmado', 'pendente'].includes(String(ag.status || '').toLowerCase())) {
-      await supabaseAdmin.from('agendamentos').update({ status: 'aguardando_confirmacao_cliente' }).eq('id', ag.id);
-    }
     return true;
   } catch (err) {
     await supabaseAdmin.from('whatsapp_logs').insert(whatsappLogPayload({ barbearia_id: ag.barbearia_id, agendamento_id: ag.id, destino: agView.cliente_whatsapp, tipo, texto, status: 'erro', erro: err.message }));

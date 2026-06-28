@@ -168,6 +168,18 @@ export default async function handler(req, res) {
 
     if (action === 'status') {
       const settings = await allowCalls(whats);
+      const webhookUrl = `${appUrlFromReq(req).replace(/\/$/, '')}/api/evolution-webhook`;
+      let webhook = null;
+      try {
+        webhook = await setWebhook({
+          apiUrl: whats.evolution_api_url,
+          apiKey: whats.evolution_api_key,
+          instanceName: whats.instance_name,
+          webhookUrl
+        });
+      } catch (err) {
+        webhook = { erro: err.message };
+      }
       const state = await connectionState({
         apiUrl: whats.evolution_api_url,
         apiKey: whats.evolution_api_key,
@@ -182,7 +194,7 @@ export default async function handler(req, res) {
           .eq('barbearia_id', loja.id);
       }
 
-      return json(res, 200, { sucesso: true, state, settings, whatsapp: publicWhatsapp(whats) });
+      return json(res, 200, { sucesso: true, state, settings, webhook, webhookUrl, whatsapp: publicWhatsapp(whats) });
     }
 
     if (action === 'create-instance' || action === 'qrcode' || action === 'save-and-qrcode') {

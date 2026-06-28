@@ -9,6 +9,8 @@ import {
 } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, whatsappLogPayload } from '../lib/db-compat.js';
 
+const TIME_ZONE = 'America/Sao_Paulo';
+
 function extractText(body) {
   return safeString(
     body?.data?.message?.conversation ||
@@ -42,8 +44,11 @@ function extractRemoteNumber(body) {
     body?.data?.remoteJid ||
     body?.remoteJid ||
     body?.data?.from ||
+    body?.data?.sender ||
+    body?.sender ||
     body?.from ||
-    body?.sender
+    body?.data?.key?.participant ||
+    body?.key?.participant
   );
 }
 
@@ -63,10 +68,59 @@ function isFromMe(body) {
   return Boolean(body?.data?.key?.fromMe || body?.key?.fromMe || body?.data?.fromMe || body?.fromMe);
 }
 
+function toMinutes(time) {
+  const [h, m] = String(time || '00:00').slice(0, 5).split(':').map(Number);
+  return h * 60 + m;
+}
+
+function saoPauloNowParts() {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(new Date())
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+}
+
+function todaySaoPaulo() {
+  const parts = saoPauloNowParts();
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function currentMinutesSaoPaulo() {
+  const parts = saoPauloNowParts();
+  return Number(parts.hour) * 60 + Number(parts.minute);
+}
+
+function isUpcomingAppointment(row) {
+  const date = String(row?.data_agendamento || '').slice(0, 10);
+  const today = todaySaoPaulo();
+  if (date > today) return true;
+  if (date < today) return false;
+  return toMinutes(row?.hora_inicio) >= currentMinutesSaoPaulo();
+}
+
 function phoneCandidates(number) {
   const normalized = normalizePhoneBR(number);
   const local = normalized.startsWith('55') ? normalized.slice(2) : normalized;
-  return [...new Set([normalized, local].filter(Boolean))];
+  const candidates = [normalized, local];
+  if (local.length === 11 && local[2] === '9') {
+    const withoutNinth = local.slice(0, 2) + local.slice(3);
+    candidates.push(withoutNinth, `55${withoutNinth}`);
+  }
+  if (local.length === 10) {
+    const withNinth = `${local.slice(0, 2)}9${local.slice(2)}`;
+    candidates.push(withNinth, `55${withNinth}`);
+  }
+  return [...new Set(candidates.filter(Boolean))];
 }
 
 async function logWhatsapp(payload) {
@@ -97,18 +151,18 @@ export default async function handler(req, res) {
     if (!whats) return json(res, 200, { recebido: true, ignorado: 'instance_not_found' });
     const loja = normalizeBarbearia(whats.barbearias || {});
 
-    const { data: ag, error: e2 } = await supabaseAdmin
+    const { data: ags, error: e2 } = await supabaseAdmin
       .from('agendamentos')
       .select('*,clientes!inner(nome,telefone),servicos(*)')
       .eq('barbearia_id', whats.barbearia_id)
       .in('clientes.telefone', phoneCandidates(from))
       .in('status', ['aguardando_confirmacao_cliente', 'confirmado', 'pendente'])
-      .gte('data_agendamento', new Date().toISOString().slice(0, 10))
+      .gte('data_agendamento', todaySaoPaulo())
       .order('data_agendamento', { ascending: true })
       .order('hora_inicio', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(10);
     if (e2) throw e2;
+    const ag = (ags || []).find(isUpcomingAppointment);
     if (!ag) return json(res, 200, { recebido: true, ignorado: 'appointment_not_found' });
 
     const agView = normalizeAgendamento(ag);
@@ -117,7 +171,7 @@ export default async function handler(req, res) {
 
     if (!isYes && !isNo) return json(res, 200, { recebido: true, ignorado: 'text_not_command' });
 
-    const status = isYes ? 'cliente_confirmou' : 'cancelado_cliente';
+    const status = isYes ? 'confirmado' : 'cancelado';
     const { data: atualizado, error: e3 } = await supabaseAdmin
       .from('agendamentos')
       .update({ status })
