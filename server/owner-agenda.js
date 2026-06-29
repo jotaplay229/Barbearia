@@ -105,6 +105,25 @@ function isInvalidWhatsappNumberError(err) {
   return msg.includes('exists') && msg.includes('false');
 }
 
+function isDuplicateSlotError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return error?.code === '23505' || msg.includes('duplicate key') || msg.includes('agendamentos_barbearia_id_barbeiro_id_data_agendamento_hora');
+}
+
+async function findExactSlot({ barbeariaId, barbeiroId, data, hora }) {
+  let query = supabaseAdmin
+    .from('agendamentos')
+    .select('id,status')
+    .eq('barbearia_id', barbeariaId)
+    .eq('data_agendamento', data)
+    .eq('hora_inicio', hora)
+    .limit(1);
+  query = barbeiroId ? query.eq('barbeiro_id', barbeiroId) : query.is('barbeiro_id', null);
+  const { data: rows, error } = await query;
+  if (error) throw error;
+  return rows?.[0] || null;
+}
+
 async function notifyClient({ loja, ag, tipo }) {
   const whats = await activeWhatsapp(loja.id);
   if (!whats) return { ok: false, erro: 'WhatsApp da barbearia nao configurado.' };
@@ -254,22 +273,39 @@ export default async function handler(req, res) {
       const start = toMinutes(hora_inicio);
       const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
       const status = safeString(body.status);
-      const { data: agendamento, error } = await supabaseAdmin
-        .from('agendamentos')
-        .insert({
-          barbearia_id: loja.id,
-          servico_id,
-          barbeiro_id,
-          cliente_id: clienteId,
-          data_agendamento,
-          hora_inicio,
-          hora_fim: toTime(end),
-          observacao: observacoes ? `[Encaixe] ${observacoes}` : '[Encaixe manual]',
-          status: status === 'pago' ? 'confirmado' : status || 'confirmado'
-        })
+      const statusFinal = status === 'pago' ? 'confirmado' : status || 'confirmado';
+      const existingSlot = await findExactSlot({
+        barbeariaId: loja.id,
+        barbeiroId: barbeiro_id,
+        data: data_agendamento,
+        hora: hora_inicio
+      });
+      if (existingSlot && !CANCELLED.has(String(existingSlot.status || '').toLowerCase())) {
+        return json(res, 409, { erro: 'Esse horario ja esta ocupado para esse profissional.' });
+      }
+      const payloadAgendamento = {
+        barbearia_id: loja.id,
+        servico_id,
+        barbeiro_id,
+        cliente_id: clienteId,
+        data_agendamento,
+        hora_inicio,
+        hora_fim: toTime(end),
+        observacao: observacoes ? `[Encaixe] ${observacoes}` : '[Encaixe manual]',
+        status: statusFinal
+      };
+      const mutation = existingSlot
+        ? supabaseAdmin.from('agendamentos').update(payloadAgendamento).eq('id', existingSlot.id)
+        : supabaseAdmin.from('agendamentos').insert(payloadAgendamento);
+      const { data: agendamento, error } = await mutation
         .select('*,clientes(nome,telefone),servicos(*),barbeiros(nome)')
         .single();
-      if (error) throw error;
+      if (error) {
+        if (isDuplicateSlotError(error)) {
+          return json(res, 409, { erro: 'Esse horario ja esta ocupado para esse profissional.' });
+        }
+        throw error;
+      }
 
       const agView = withPaidFlag({
         ...agendamento,

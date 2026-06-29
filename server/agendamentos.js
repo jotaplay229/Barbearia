@@ -5,6 +5,7 @@ import { msgClienteConfirmado } from '../lib/messages.js';
 import { normalizeAgendamento, normalizeBarbearia, normalizeServico, serviceForBarber, whatsappLogPayload } from '../lib/db-compat.js';
 
 const TIME_ZONE = 'America/Sao_Paulo';
+const CANCELLED_STATUSES = ['cancelado', 'recusado', 'cancelado_cliente'];
 
 function toMinutes(t) {
   const [h, m] = String(t || '00:00').split(':').map(Number);
@@ -93,6 +94,26 @@ async function logWhatsapp({ barbearia_id, agendamento_id, destino, tipo, texto,
 function isInvalidWhatsappNumberError(err) {
   const msg = String(err?.message || '').toLowerCase();
   return msg.includes('exists') && msg.includes('false');
+}
+
+function isDuplicateSlotError(error) {
+  const msg = String(error?.message || '').toLowerCase();
+  return error?.code === '23505' || msg.includes('duplicate key') || msg.includes('agendamentos_barbearia_id_barbeiro_id_data_agendamento_hora');
+}
+
+async function findCancelledSlot({ barbeariaId, barbeiroId, data, hora }) {
+  let query = supabaseAdmin
+    .from('agendamentos')
+    .select('id,status')
+    .eq('barbearia_id', barbeariaId)
+    .eq('data_agendamento', data)
+    .eq('hora_inicio', hora)
+    .in('status', CANCELLED_STATUSES)
+    .limit(1);
+  query = barbeiroId ? query.eq('barbeiro_id', barbeiroId) : query.is('barbeiro_id', null);
+  const { data: rows, error } = await query;
+  if (error) throw error;
+  return rows?.[0] || null;
 }
 
 export default async function handler(req, res) {
@@ -224,22 +245,35 @@ export default async function handler(req, res) {
       clienteId = novoCliente.id;
     }
 
-    const { data: agendamento, error: e5 } = await supabaseAdmin
-      .from('agendamentos')
-      .insert({
-        barbearia_id: loja.id,
-        servico_id,
-        barbeiro_id,
-        cliente_id: clienteId,
-        data_agendamento,
-        hora_inicio,
-        hora_fim: toTime(end),
-        observacao: observacoes,
-        status: 'confirmado'
-      })
+    const payloadAgendamento = {
+      barbearia_id: loja.id,
+      servico_id,
+      barbeiro_id,
+      cliente_id: clienteId,
+      data_agendamento,
+      hora_inicio,
+      hora_fim: toTime(end),
+      observacao: observacoes,
+      status: 'confirmado'
+    };
+    const slotCancelado = await findCancelledSlot({
+      barbeariaId: loja.id,
+      barbeiroId: barbeiro_id,
+      data: data_agendamento,
+      hora: hora_inicio
+    });
+    const mutation = slotCancelado
+      ? supabaseAdmin.from('agendamentos').update(payloadAgendamento).eq('id', slotCancelado.id)
+      : supabaseAdmin.from('agendamentos').insert(payloadAgendamento);
+    const { data: agendamento, error: e5 } = await mutation
       .select('*')
       .single();
-    if (e5) throw e5;
+    if (e5) {
+      if (isDuplicateSlotError(e5)) {
+        return json(res, 409, { erro: 'Esse horario acabou de ser reservado por outra pessoa. Escolha outro horario disponivel.' });
+      }
+      throw e5;
+    }
     const agendamentoView = normalizeAgendamento({
       ...agendamento,
       clientes: { nome: cliente_nome, telefone: cliente_whatsapp },
