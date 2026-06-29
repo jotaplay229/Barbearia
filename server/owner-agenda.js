@@ -24,6 +24,14 @@ function toTime(min) {
   return `${h}:${m}`;
 }
 
+function isValidTime(t) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(t || '').slice(0, 5));
+  if (!match) return false;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return h >= 0 && h < 24 && m >= 0 && m < 60;
+}
+
 function cleanFinance(finance = {}) {
   const lancamentos = Array.isArray(finance.lancamentos) ? finance.lancamentos : [];
   const agendamentosPagos = Array.isArray(finance.agendamentos_pagos) ? finance.agendamentos_pagos : [];
@@ -220,6 +228,9 @@ export default async function handler(req, res) {
       if (!cliente_nome || !cliente_whatsapp || !servico_id || !data_agendamento || !hora_inicio) {
         return json(res, 400, { erro: 'Preencha cliente, WhatsApp, servico, data e horario.' });
       }
+      if (!isValidTime(hora_inicio)) {
+        return json(res, 400, { erro: 'Informe um horario valido.' });
+      }
       if (!isValidMobilePhoneBR(cliente_whatsapp)) {
         return json(res, 400, { erro: 'Digite um WhatsApp valido com DDD e 9 digitos.' });
       }
@@ -273,6 +284,9 @@ export default async function handler(req, res) {
 
       const start = toMinutes(hora_inicio);
       const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
+      if (end >= 1440) {
+        return json(res, 400, { erro: 'Esse horario termina depois da meia-noite. Escolha um horario mais cedo.' });
+      }
       const status = safeString(body.status);
       const statusFinal = status === 'pago' ? 'confirmado' : status || 'confirmado';
       const existingSlot = await findExactSlot({

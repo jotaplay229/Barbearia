@@ -22,6 +22,14 @@ function toTime(min) {
   return `${h}:${m}`;
 }
 
+function isValidTime(t) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(t || '').slice(0, 5));
+  if (!match) return false;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return h >= 0 && h < 24 && m >= 0 && m < 60;
+}
+
 function dayOfWeek(dateStr) {
   const [y, m, d] = String(dateStr || '').split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
@@ -56,7 +64,7 @@ function isPastAppointment(dateStr, startMinutes) {
 }
 function cleanSlots(slots) {
   return Array.isArray(slots)
-    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(t => /^\d{2}:\d{2}$/.test(t)))].sort()
+    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(isValidTime))].sort()
     : [];
 }
 function customSlotsForDay(loja, dow, barbeiroId) {
@@ -135,7 +143,7 @@ export default async function handler(req, res) {
     if (!isValidMobilePhoneBR(cliente_whatsapp)) {
       return json(res, 400, { erro: 'Digite um WhatsApp valido com DDD e 9 digitos.' });
     }
-    if (!/^\d{2}:\d{2}$/.test(hora_inicio)) {
+    if (!isValidTime(hora_inicio)) {
       return json(res, 400, { erro: 'Informe um horario valido.' });
     }
 
@@ -189,6 +197,9 @@ export default async function handler(req, res) {
 
     const start = toMinutes(hora_inicio);
     const end = start + Number(servicoNorm.duracao_minutos || loja.intervalo_minutos || 30);
+    if (end >= 1440) {
+      return json(res, 400, { erro: 'Esse servico passaria da meia-noite. Escolha um horario mais cedo.' });
+    }
     if (isPastAppointment(data_agendamento, start)) {
       return json(res, 400, { erro: 'Esse horario ja passou. Escolha outro horario disponivel.' });
     }

@@ -7,7 +7,13 @@ function cleanTimes(value) {
   const arr = Array.isArray(value) ? value : String(value || '').split(/[,\n;]/);
   return [...new Set(arr
     .map(v => safeString(v).slice(0, 5))
-    .filter(v => /^\d{2}:\d{2}$/.test(v))
+    .filter(v => {
+      const match = /^(\d{2}):(\d{2})$/.exec(v);
+      if (!match) return false;
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      return h >= 0 && h < 24 && m >= 0 && m < 60;
+    })
     .sort())];
 }
 

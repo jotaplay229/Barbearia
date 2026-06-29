@@ -13,6 +13,13 @@ function toTime(min) {
   const m = String(min % 60).padStart(2, '0');
   return `${h}:${m}`;
 }
+function isValidTime(t) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(t || '').slice(0, 5));
+  if (!match) return false;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return h >= 0 && h < 24 && m >= 0 && m < 60;
+}
 function overlaps(startA, endA, startB, endB) {
   return startA < endB && endA > startB;
 }
@@ -52,7 +59,7 @@ function minVisibleStartForDate(dateStr) {
 }
 function cleanSlots(slots) {
   return Array.isArray(slots)
-    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(t => /^\d{2}:\d{2}$/.test(t)))].sort()
+    ? [...new Set(slots.map(t => safeString(t).slice(0, 5)).filter(isValidTime))].sort()
     : [];
 }
 function customSlotsForDay(loja, dow, barbeiroId) {
@@ -127,10 +134,11 @@ export default async function handler(req, res) {
     if (customSlots.length) {
       for (const t of customSlots) {
         const m = toMinutes(t);
-        if (m > minStart && !busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
+        const end = m + duracao;
+        if (end < 1440 && m > minStart && !busy.some(slot => overlaps(m, end, slot.start, slot.end))) horarios.push(t);
       }
     } else {
-      for (let m = open; m + duracao <= close; m += intervalo) {
+      for (let m = open; m + duracao <= close && m + duracao < 1440; m += intervalo) {
         const t = toTime(m);
         if (m > minStart && !busy.some(slot => overlaps(m, m + duracao, slot.start, slot.end))) horarios.push(t);
       }
