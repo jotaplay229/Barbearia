@@ -76,9 +76,12 @@ function setFavicon(url){
   document.head.appendChild(icon);
 }
 function money(c){return (Number(c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
-function isoPlus(i){const d=new Date();d.setDate(d.getDate()+i);return d.toISOString().slice(0,10)}
+const APP_TZ='America/Sao_Paulo';
+function spParts(date=new Date()){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:APP_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))}
+function isoFromParts(year,month,day){const d=new Date(Date.UTC(Number(year),Number(month)-1,Number(day),12));return d.toISOString().slice(0,10)}
+function isoPlus(i){const p=spParts();return isoFromParts(p.year,p.month,Number(p.day)+Number(i||0))}
 function brDate(d){const [y,m,dd]=String(d).split('-');return `${dd}/${m}`}
-function weekday(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')}
+function weekday(d){return new Intl.DateTimeFormat('pt-BR',{weekday:'short',timeZone:APP_TZ}).format(new Date(d+'T12:00:00-03:00')).replace('.','')}
 function initials(n){return String(n||'').split(' ').filter(Boolean).map(x=>x[0]).slice(0,2).join('').toUpperCase()||'✂'}
 function onlyDigits(v){return String(v||'').replace(/\D/g,'')}
 function localPhoneDigits(v){let d=onlyDigits(v);if(d.startsWith('55')&&d.length>11)d=d.slice(2);return d.slice(0,11)}

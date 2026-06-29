@@ -120,10 +120,13 @@ function agendaLink(){return location.origin+'/agendar?slug='+encodeURIComponent
 function onlyDigits(v){return String(v||'').replace(/\D/g,'')}
 function localPhoneDigits(v){let d=onlyDigits(v);if(d.startsWith('55')&&d.length>11)d=d.slice(2);return d.slice(0,11)}
 function formatPhoneBR(v){const d=localPhoneDigits(v);if(d.length<=2)return d;if(d.length<=6)return `(${d.slice(0,2)}) ${d.slice(2)}`;if(d.length<=10)return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`}
-function isoDate(d=new Date()){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
-function datePlus(days,base=new Date()){const d=new Date(base);d.setDate(d.getDate()+days);return isoDate(d)}
-function dayLabel(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')}
-function weekDates(){const start=new Date();const day=start.getDay();start.setDate(start.getDate()+(day===0?-6:1-day));return [0,1,2,3,4,5,6].map(i=>{const d=new Date(start);d.setDate(start.getDate()+i);return isoDate(d)})}
+const APP_TZ='America/Sao_Paulo';
+function spParts(date=new Date()){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:APP_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]))}
+function isoFromParts(year,month,day){const d=new Date(Date.UTC(Number(year),Number(month)-1,Number(day),12));return d.toISOString().slice(0,10)}
+function isoDate(d=new Date()){const p=spParts(d);return isoFromParts(p.year,p.month,p.day)}
+function datePlus(days,base=new Date()){const p=spParts(base);return isoFromParts(p.year,p.month,Number(p.day)+Number(days||0))}
+function dayLabel(d){return new Intl.DateTimeFormat('pt-BR',{weekday:'short',timeZone:APP_TZ}).format(new Date(d+'T12:00:00-03:00')).replace('.','')}
+function weekDates(){const p=spParts();const start=new Date(Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),12));const day=start.getUTCDay();start.setUTCDate(start.getUTCDate()+(day===0?-6:1-day));return [0,1,2,3,4,5,6].map(i=>isoFromParts(start.getUTCFullYear(),start.getUTCMonth()+1,start.getUTCDate()+i))}
 function centsFromInput(v){const raw=String(v||'0').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');return Math.round(Number(raw||0)*100)}
 function moneyInput(c){return (Number(c||0)/100).toFixed(2).replace('.',',')}
 function activeAgenda(arr){return (arr||[]).filter(a=>!['cancelado','recusado','cancelado_cliente'].includes(String(a.status||'').toLowerCase()))}
