@@ -289,7 +289,8 @@ export default async function handler(req, res) {
         cliente_nome,
         servico_nome: servicoNorm.nome,
         data_agendamento,
-        hora_inicio
+        hora_inicio,
+        observacao: observacoes
       });
       try {
         const retorno = await sendText({

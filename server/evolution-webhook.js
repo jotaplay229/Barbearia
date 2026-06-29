@@ -277,7 +277,8 @@ export default async function handler(req, res) {
       cliente_nome: agView.cliente_nome,
       servico_nome: agView.servicos?.nome || 'Serviço',
       data_agendamento: agView.data_agendamento,
-      hora_inicio: String(agView.hora_inicio).slice(0, 5)
+      hora_inicio: String(agView.hora_inicio).slice(0, 5),
+      observacao: agView.observacoes
     };
     const respostaCliente = isYes
       ? msgClientePresencaConfirmada(baseMsg)

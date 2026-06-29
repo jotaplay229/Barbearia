@@ -134,7 +134,8 @@ async function notifyClient({ loja, ag, tipo }) {
     cliente_nome: agView.cliente_nome,
     servico_nome: agView.servicos?.nome || 'Servico',
     data_agendamento: agView.data_agendamento,
-    hora_inicio: String(agView.hora_inicio).slice(0, 5)
+    hora_inicio: String(agView.hora_inicio).slice(0, 5),
+    observacao: agView.observacoes
   };
   const texto = tipo === 'cancelado'
     ? msgClienteCancelamentoConfirmado(base)
