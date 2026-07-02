@@ -116,6 +116,8 @@ async function sendReminder(ag, whats, tipo) {
     barbearia: loja,
     cliente_nome: agView.cliente_nome,
     servico_nome: agView.servicos?.nome || 'Serviço',
+    barbeiro_nome: agView.barbeiros?.nome,
+    servico_preco_cents: agView.servicos?.preco_cents,
     data_agendamento: agView.data_agendamento,
     hora_inicio: String(agView.hora_inicio).slice(0, 5),
     observacao: agView.observacoes
@@ -285,7 +287,7 @@ export default async function handler(req, res) {
 
     const { data: ags, error } = await supabaseAdmin
       .from('agendamentos')
-      .select('*,clientes(nome,telefone),servicos(*),barbearias(*)')
+      .select('*,clientes(nome,telefone),servicos(*),barbearias(*),barbeiros(nome)')
       .in('data_agendamento', dates)
       .in('status', ['confirmado', 'pendente']);
     if (error) throw error;
