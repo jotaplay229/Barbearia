@@ -299,6 +299,8 @@ export default async function handler(req, res) {
         barbearia: loja,
         cliente_nome,
         servico_nome: servicoNorm.nome,
+        barbeiro_nome: barbeiro?.nome,
+        servico_preco_cents: servicoNorm.preco_cents,
         data_agendamento,
         hora_inicio,
         observacao: observacoes
