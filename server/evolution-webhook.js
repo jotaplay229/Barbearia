@@ -212,7 +212,7 @@ async function findWhatsappByBarbearia(barbeariaId) {
 async function findAppointmentForReply({ from, barbeariaId = null }) {
   let query = supabaseAdmin
     .from('agendamentos')
-    .select('*,clientes!inner(nome,telefone),servicos(*),barbearias(*)')
+    .select('*,clientes!inner(nome,telefone),servicos(*),barbearias(*),barbeiros(nome)')
     .in('clientes.telefone', phoneCandidates(from))
     .in('status', ['aguardando_confirmacao_cliente', 'confirmado', 'pendente'])
     .gte('data_agendamento', todaySaoPaulo())
@@ -276,6 +276,8 @@ export default async function handler(req, res) {
       barbearia: loja,
       cliente_nome: agView.cliente_nome,
       servico_nome: agView.servicos?.nome || 'Serviço',
+      barbeiro_nome: agView.barbeiros?.nome,
+      servico_preco_cents: agView.servicos?.preco_cents,
       data_agendamento: agView.data_agendamento,
       hora_inicio: String(agView.hora_inicio).slice(0, 5),
       observacao: agView.observacoes
