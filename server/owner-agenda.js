@@ -141,6 +141,8 @@ async function notifyClient({ loja, ag, tipo }) {
     barbearia: loja,
     cliente_nome: agView.cliente_nome,
     servico_nome: agView.servicos?.nome || 'Servico',
+    barbeiro_nome: agView.barbeiros?.nome,
+    servico_preco_cents: agView.servicos?.preco_cents,
     data_agendamento: agView.data_agendamento,
     hora_inicio: String(agView.hora_inicio).slice(0, 5),
     observacao: agView.observacoes
