@@ -286,11 +286,30 @@ async function testWhats(){
   if(!j.erro) toast('Mensagem de teste enviada');
 }
 
+function formatEventos(eventos){
+  if(!eventos || !eventos.length) return '  (nenhum evento recebido ainda - o webhook pode nao estar chegando)';
+  return eventos.map(e=>{
+    const hora=e.hora?new Date(e.hora).toLocaleString('pt-BR'):'?';
+    return `  ${hora} - de ${e.numero||'?'} - "${e.texto||''}" - ${e.origem||'?'}`;
+  }).join('\n');
+}
+
 async function statusWhats(){
   const j=await request('owner-whatsapp',{method:'POST',body:JSON.stringify({action:'status'})}).catch(e=>({erro:e.message}));
-  setWres(j);
+  if(j?.erro){ setWres(j); qrState.textContent='verifique'; return; }
   const raw=JSON.stringify(j).toLowerCase();
-  qrState.textContent=raw.includes('open')||raw.includes('connected')||raw.includes('conectado')?'conectado':'verifique';
+  const conectado=raw.includes('open')||raw.includes('connected')||raw.includes('conectado');
+  qrState.textContent=conectado?'conectado':'verifique';
+  const eventos=j.ultimosEventos?.eventos||[];
+  wres.textContent=[
+    `Conexao: ${conectado?'conectado':'verifique (nao aparenta estar aberta)'}`,
+    `Webhook esperado: ${j.webhookUrl||'-'}`,
+    `Webhook configurado na Evolution:`,
+    JSON.stringify(j.webhookAtual,null,2),
+    ``,
+    `Ultimos eventos recebidos (mais novo primeiro):`,
+    formatEventos(eventos)
+  ].join('\n');
 }
 
 async function logoutWhats(){
