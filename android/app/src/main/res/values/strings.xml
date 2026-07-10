@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BarberOS Painel</string>
+    <string name="title_activity_main">BarberOS Painel</string>
+    <string name="package_name">com.barberos.painel</string>
+    <string name="custom_url_scheme">com.barberos.painel</string>
+</resources>

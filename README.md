@@ -18,6 +18,27 @@
 - Agenda publica: `/b/slug-da-barbearia`
 - Cron de lembretes: `/api/cron-lembretes?secret=SUA_CHAVE`
 
+## App Android do painel
+
+O projeto ja vem preparado para gerar um APK do painel do dono da barbearia.
+
+Como gerar no Windows:
+
+1. Instale o Android Studio.
+2. Durante a instalacao, aceite instalar o Android SDK e o Java/JDK.
+3. Reinicie o computador se o terminal ainda nao reconhecer o Java.
+4. No projeto, rode `npm run android:sync`.
+5. Rode `npm run android:open` para abrir no Android Studio.
+6. No Android Studio, use `Build > Build Bundle(s) / APK(s) > Build APK(s)`.
+
+O app abre direto o painel publicado em `https://barbearia-virtual.vercel.app/painel`, entao cada atualizacao na Vercel ja aparece no aplicativo sem precisar gerar um APK novo.
+
+Atalho sem APK:
+
+- No Chrome do celular, abra `https://barbearia-virtual.vercel.app/painel`.
+- Toque em `Adicionar a tela inicial`.
+- O painel instala como app pelo navegador.
+
 ## Lembrete de 30 minutos
 
 O endpoint `/api/cron-lembretes?secret=SUA_CHAVE` envia a mensagem para o cliente quando faltam cerca de 30 minutos para o horario marcado.

@@ -1,0 +1,13 @@
+{
+  "appId": "com.barberos.painel",
+  "appName": "BarberOS Painel",
+  "webDir": "mobile-shell",
+  "server": {
+    "url": "https://barbearia-virtual.vercel.app/painel",
+    "cleartext": false
+  },
+  "android": {
+    "backgroundColor": "#050505",
+    "allowMixedContent": false
+  }
+}

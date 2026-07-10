@@ -6,11 +6,18 @@
   "scripts": {
     "dev": "vercel dev",
     "start": "vercel dev",
-    "build": "echo \"No build step required\""
+    "build": "echo \"No build step required\"",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "cd android && gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@supabase/supabase-js": "latest",
     "qrcode": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1"
+  }
 }

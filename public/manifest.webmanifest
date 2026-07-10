@@ -1,0 +1,34 @@
+{
+  "name": "BarberOS Painel da Barbearia",
+  "short_name": "BarberOS",
+  "description": "Painel mobile para donos de barbearia configurarem agenda, servicos, equipe, WhatsApp e financeiro.",
+  "start_url": "/painel?app=1",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/barberos-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Abrir painel",
+      "short_name": "Painel",
+      "url": "/painel",
+      "icons": [{ "src": "/icons/barberos-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Agenda publica",
+      "short_name": "Agenda",
+      "url": "/agendar",
+      "icons": [{ "src": "/icons/barberos-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

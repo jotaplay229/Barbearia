@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Painel da Barbearia · BarberOS</title>
+<meta name="theme-color" content="#050505">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BarberOS">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/barberos-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/barberos-icon.svg">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -35,6 +43,7 @@ body:after{content:"";position:fixed;left:-15%;bottom:-30%;width:55vw;height:55v
 @media(max-width:720px){.agendaMatrix{min-width:560px}.agendaCell{padding:8px}.agendaCard{padding:9px}.agendaCard .rowActions{display:grid}.agendaCard .rowActions .btn{width:100%}}
 @media(max-width:980px){.stats3,.financeGrid,.financeSplit{grid-template-columns:1fr}}
 @media(max-width:980px){.formgrid.three{grid-template-columns:1fr}}
+@media(max-width:720px){body{font-size:15px}.loginWrap{padding:18px 14px}.loginCard{padding:24px 18px}.app.show{padding-bottom:env(safe-area-inset-bottom)}.side{padding:12px;border-bottom:1px solid rgba(255,255,255,.10)}.brand{padding:4px 4px 12px}.brandLogo{width:54px;height:54px;border-radius:18px}.nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.nav button{min-height:48px;padding:11px;background:rgba(255,255,255,.045);justify-content:center;text-align:center}.nav button.active:after{display:none}.statusBox{margin-top:10px}.top{height:auto;min-height:66px;padding:12px 14px;gap:10px}.top h2{font-size:20px}.top>.btn.danger{padding:11px 14px}.content{padding:12px}.card{border-radius:20px;padding:14px}.btn,.inp,select,textarea{min-height:48px;font-size:15px}.grid4{grid-template-columns:1fr}.row{align-items:flex-start}.rowActions{width:100%}.rowActions .btn{flex:1;min-width:128px}.agendaBoard{max-width:100%;overflow-x:auto}.agendaMatrix{min-width:640px}.financeBars{height:130px}}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff!important;color:#111!important}body:before,body:after,.side,.top,.toast,.noPrint{display:none!important}.app.show{display:block}.content{max-width:none;padding:0}.card{break-inside:avoid;border-color:#d7d7d7;color:#111;background:#fff;box-shadow:none}.printHead{display:block;color:#111;margin-bottom:18px}.financeGrid,.financeSplit{grid-template-columns:1fr!important}.financeBars{height:210px;gap:8px;align-items:end;border-left:1px solid #ddd;border-bottom:1px solid #999;padding:10px 8px 0}.financeBar{background:#cfcfcf!important;color:#111!important;border:1px solid #888;box-shadow:inset 0 0 0 999px #cfcfcf;min-height:24px;border-radius:10px 10px 0 0;font-size:12px;padding-top:7px}.financeBar.bad{background:#e5b5b5!important;box-shadow:inset 0 0 0 999px #e5b5b5}.financeBar.zero{height:24px!important;background:#f4f4f4!important;box-shadow:inset 0 0 0 999px #f4f4f4;color:#777!important;opacity:1}.chartLabels{color:#555}.table th,.table td{color:#111;border-color:#ddd}.pill{border:1px solid #ddd;color:#111;background:#fff}.bar{background:#ddd!important;color:#111!important}}
 </style>
 </head>
@@ -87,6 +96,7 @@ body:after{content:"";position:fixed;left:-15%;bottom:-30%;width:55vw;height:55v
 </div>
 <div class="toast" id="toast">Salvo!</div>
 <script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
 let token='', refreshToken='', tokenExpiresAt=0, refreshInFlight=null, me=null, barbearia=null, current='dash', liveTimer=null, lastDashSig='', lastAgendaSig='';
 let servicosCache=[], barbeirosCache=[], editingServico='', editingBarbeiro='';
 function apiUrl(route,params={}){const u=new URL('/api/router',location.origin);u.searchParams.set('route',route);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null)u.searchParams.set(k,v)});return u.pathname+u.search}
